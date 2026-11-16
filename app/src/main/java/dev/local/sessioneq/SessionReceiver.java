@@ -6,6 +6,9 @@ import android.media.audiofx.AudioEffect;
 
 public class SessionReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context,Intent intent) {
+        String owner=intent.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME);
+        if(SessionPolicy.isBlocked(owner))return;
+        if(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())&&!SessionPolicy.mayAttach(owner))return;
         int session=intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION,0);
         if(session<=0) return;
         if(EqService.instance!=null) { EqService.instance.session(intent); return; }
@@ -17,9 +20,12 @@ public class SessionReceiver extends BroadcastReceiver {
         EqService.channel(context);
         Intent open=new Intent(context,MainActivity.class).putExtras(intent).setAction(intent.getAction());
         PendingIntent pi=PendingIntent.getActivity(context,2,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        String player=owner;
+        try {player=context.getPackageManager().getApplicationLabel(context.getPackageManager().getApplicationInfo(owner,0)).toString();}
+        catch(android.content.pm.PackageManager.NameNotFoundException ignored){}
         Notification n=new Notification.Builder(context,EqService.CHANNEL).setSmallIcon(R.drawable.ic_stat_equalizer)
             .setContentTitle("Подключить Session EQ")
-            .setContentText("Нажми для подключения к аудиосессии "+session)
+            .setContentText("Подключить к "+player)
             .setContentIntent(pi).setAutoCancel(true).build();
         context.getSystemService(NotificationManager.class).notify(2,n);
     }

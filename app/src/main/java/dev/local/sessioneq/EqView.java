@@ -120,7 +120,7 @@ public final class EqView extends View {
                     else if(y<50&&x>310)host.diagnostics();
                     else if(y<50)host.presets();
                     else if(y>h-69) {
-                        if(x<82){state.enabled=!state.enabled;host.changed();}
+                        if(x<82)host.toggleEqualizer();
                         else if(x<165){state.auto=!state.auto;host.changed();}
                         else if(x<295)host.presets();
                         else host.menu();

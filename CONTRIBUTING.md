@@ -16,6 +16,9 @@ For audio lifecycle changes, also test on a real device:
 - closing one of several sessions and closing the final session;
 - OFF with the screen closed: no retained foreground service or native effects;
 - unchanged screenshot Rock values and Windows preset data.
+- the player picker while OFF, stale/closed sessions, missing DUMP access and
+  refresh/cancel while the picker is scanning;
+- AIMP is absent from the picker and its OPEN/panel requests create no effects.
 
 Do not introduce polling, wake locks, network access or automatic grants of
 permissions without explaining why they are needed. Hardware audio behavior

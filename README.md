@@ -17,8 +17,8 @@ not a device screenshot.*
 - Screenshot-based Rock, Flat, 24 separately labelled AIMP Windows presets,
   and saved user presets.
 - ON/OFF, optional stereo-linked limiter, and AUTO preamp headroom compensation.
-- External-player effect-panel integration, session OPEN/CLOSE handling,
-  manual session ID entry, and readable diagnostics.
+- A picker for currently playing apps, external-player effect-panel integration,
+  session OPEN/CLOSE handling, and readable diagnostics. AIMP is excluded.
 - Event-based status updates with no periodic background polling, wake locks,
   network access, microphone permission or Accessibility service.
 
@@ -28,10 +28,44 @@ Android 9+ (API 28). Actual support depends on the device's DynamicsProcessing
 implementation and the source player's audio output path. Creating an enabled
 object does not by itself prove that every output is processed.
 
-Select Session EQ as an external equalizer in the music player, then restart
-playback. If the player directs session notifications to a different equalizer,
-use Settings → Connect audio session and enter the **current** session ID.
-Session IDs can change; a previously observed ID is not a permanent player ID.
+Start music, then choose Settings → Connect audio session in Session EQ and
+select the player's name. The OFF button also opens this picker when no player
+is connected. Selection enables the equalizer and connects the current streams
+of that player; stale sessions are rechecked before attaching. No process or
+audio-session ID entry is required.
+
+### One-time player discovery access
+
+Android does not expose the audio-session IDs of unrelated players through its
+normal public playback list. On-demand discovery uses `Debug.dumpService` for
+AudioService and requires the development permission `android.permission.DUMP`.
+After installing the APK, grant it once using a computer with USB debugging:
+
+```sh
+adb shell pm grant dev.local.sessioneq android.permission.DUMP
+```
+
+The app explains this setup and offers to copy the command if access is missing.
+It does not silently grant access. The scan runs only when opening/refreshing the
+picker and rechecking a selection, on a worker thread. It reads only the audio
+service dump into a private temporary cache file, deletes it immediately after
+reading, and does not log or upload the dump. A process killed during that read
+may leave a temporary cache file until cleanup. No notification-listener access,
+root, microphone or network permission is required.
+
+The dump format is device-dependent. Current active records are used; historical
+playback events, invalid session IDs, other user profiles, calls/system tones,
+ambiguous shared UIDs and AIMP are not offered. Package visibility is limited to
+launcher applications plus AIMP for explicit exclusion; no QUERY_ALL_PACKAGES
+permission is requested.
+
+AIMP (`com.aimp.player` and its package variants) is rejected in discovery,
+incoming OPEN requests, external-panel intents, session registry and native
+attachment. An unknown owner is never guessed. This prevents ordinary AIMP
+integration events from applying Session EQ on top of AIMP's own equalizer.
+
+Players can also select Session EQ as their external effect panel and announce
+their audio session directly. That integration does not require DUMP access.
 
 A stopped background service may show a notification asking you to reconnect
 when a new session arrives. Tap it to resume: Android restricts starting
@@ -83,8 +117,9 @@ On Windows:
 
 APK output: `app/build/outputs/apk/debug/app-debug.apk`.
 GitHub Actions runs the same checks and uploads the debug APK as a workflow
-artifact. JVM checks cover EQ math, screenshot Rock values, and session registry
-behavior; audio lifecycle and battery use still need device tests.
+artifact. JVM checks cover EQ math, screenshot Rock values, session registry,
+current-playback parsing and AIMP exclusion; Android discovery, audio lifecycle
+and battery use still need device tests.
 
 An alternative Linux SDK-tools build is available as `./build.sh`; it supports
 `ANDROID_HOME`, `ANDROID_SDK_ROOT` or `SESSION_EQ_SDK`. Its APKs go into `dist/`.

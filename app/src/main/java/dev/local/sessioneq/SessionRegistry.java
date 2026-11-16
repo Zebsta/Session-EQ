@@ -7,6 +7,7 @@ public final class SessionRegistry {
     private final LinkedHashMap<Integer,String> sessions=new LinkedHashMap<>();
     public Integer remember(int id,String owner) {
         if(id<=0)throw new IllegalArgumentException("Session ID must be positive");
+        if(!SessionPolicy.mayAttach(owner))throw new IllegalArgumentException("Excluded or unknown player");
         Integer evicted=null;
         if(!sessions.containsKey(id)&&sessions.size()>=8) {
             evicted=sessions.keySet().iterator().next();sessions.remove(evicted);

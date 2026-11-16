@@ -11,6 +11,11 @@ framework views and DynamicsProcessing; there are no application dependencies.
 - Preserve the event-based lifecycle. No periodic status/audio-session polling,
   wake locks or foreground service when OFF or without native effects.
 - Do not change filter parameters while doing unrelated UI work.
+- AIMP must never be offered by player discovery or connected by incoming OPEN
+  or effect-panel requests. Preserve SessionPolicy checks on all attach paths.
+- Player discovery is on demand and requires optional one-time DUMP access.
+  Never add background scanning, notification access, automatic permission grants
+  or manual session-ID entry to the normal picker flow.
 - Run `./gradlew verifyCore :app:assembleDebug` for implementation changes.
 - Actual audio behavior and battery use require device testing; distinguish local
   checks from measured device results.
