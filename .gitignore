@@ -1,0 +1,11 @@
+build/
+app/build/
+.gradle/
+local.properties
+*.keystore
+*.jks
+*.idsig
+dist/
+.idea/
+.DS_Store
+reference/aimp-windows/*.zip

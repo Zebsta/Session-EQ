@@ -1,0 +1,23 @@
+plugins { id 'com.android.application' version '8.7.3' apply false }
+
+tasks.register('compileCoreChecks', JavaCompile) {
+    source files('app/src/main/java/dev/local/sessioneq/EqMath.java',
+                 'app/src/main/java/dev/local/sessioneq/SessionRegistry.java',
+                 'tests/EqMathTest.java', 'tests/SessionRegistryTest.java')
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('core-checks')
+    sourceCompatibility = '1.8'
+    targetCompatibility = '1.8'
+    options.encoding = 'UTF-8'
+}
+tasks.register('verifyEqMath', JavaExec) {
+    dependsOn 'compileCoreChecks'
+    classpath = files(layout.buildDirectory.dir('core-checks'))
+    mainClass = 'EqMathTest'
+}
+tasks.register('verifySessionRegistry', JavaExec) {
+    dependsOn 'compileCoreChecks'
+    classpath = files(layout.buildDirectory.dir('core-checks'))
+    mainClass = 'SessionRegistryTest'
+}
+tasks.register('verifyCore') { dependsOn 'verifyEqMath', 'verifySessionRegistry' }

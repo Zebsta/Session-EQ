@@ -1,0 +1,16 @@
+Session EQ
+Copyright 2026 Zebsta
+
+Session EQ is an independent Android equalizer inspired by AIMP's equalizer UI.
+It is not affiliated with or endorsed by AIMP or its author.
+No AIMP executable code is included in this repository or the application.
+
+Material Icons (tune, settings)
+Source: https://github.com/google/material-design-icons
+License: Apache License 2.0
+The original paths are adapted as Android vector drawables and combined with
+the application's ring layout. See THIRD_PARTY_NOTICES.md for source links.
+
+The AIMP Windows equalizer preset values are compatibility/reference data
+extracted from the official distribution. Their origin is credited separately;
+they are not represented as original Session EQ presets or AIMP source code.

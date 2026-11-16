@@ -1,0 +1,31 @@
+package dev.local.sessioneq;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+public final class EqState {
+    public final float[] gains = new float[20];
+    public float preamp, balance;
+    public boolean enabled, auto;
+    public boolean limiter = true;
+    public String preset = "Rock";
+    public int manualSession;
+    public EqState(Context context) {
+        SharedPreferences p = context.getSharedPreferences("eq", 0);
+        for(int i=0;i<20;i++) gains[i]=EqMath.clamp(p.getFloat("band"+i,EqMath.ROCK[i]),-15,15);
+        preamp=EqMath.clamp(p.getFloat("preamp",0),-15,15);
+        balance=EqMath.clamp(p.getFloat("balance",0),-1,1);
+        enabled=p.getBoolean("enabled",false);
+        auto=p.getBoolean("auto",false);
+        limiter=p.getBoolean("limiter",true);
+        preset=p.getString("preset","Rock");
+        manualSession=p.getInt("manualSession",0);
+    }
+    public void save(Context context) {
+        SharedPreferences.Editor e=context.getSharedPreferences("eq",0).edit();
+        for(int i=0;i<20;i++) e.putFloat("band"+i,gains[i]);
+        e.putFloat("preamp",preamp).putFloat("balance",balance).putBoolean("enabled",enabled)
+            .putBoolean("auto",auto).putBoolean("limiter",limiter).putString("preset",preset)
+            .putInt("manualSession",manualSession).apply();
+    }
+}

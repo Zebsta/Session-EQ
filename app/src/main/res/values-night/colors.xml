@@ -1,0 +1,15 @@
+<resources>
+    <color name="eq_background">#383838</color>
+    <color name="eq_text">#F0F0F0</color>
+    <color name="eq_muted">#B0B0B0</color>
+    <color name="eq_accent">#E69A23</color>
+    <color name="eq_track">#5A5A5A</color>
+    <color name="eq_border">#505050</color>
+    <color name="eq_zero">#9A6F2D</color>
+    <color name="eq_toolbar">#262626</color>
+    <color name="eq_button_on">#0F0F0F</color>
+    <color name="eq_button_off">#202020</color>
+    <color name="eq_on_text">#FFFFFF</color>
+    <color name="eq_off_text">#B0B0B0</color>
+    <color name="icon_background">#C96E00</color>
+</resources>
