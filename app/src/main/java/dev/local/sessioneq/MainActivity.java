@@ -74,7 +74,11 @@ public class MainActivity extends Activity {
     }
     private void consume(Intent source) {
         if(source!=null&&source.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION,0)>0) {
-            queueSession(new Intent(source));
+            String owner=source.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME);
+            if(owner==null)owner=getCallingPackage();
+            if(owner==null&&getReferrer()!=null&&"android-app".equals(getReferrer().getScheme()))owner=getReferrer().getHost();
+            if(!SessionPolicy.mayAttach(owner))return;
+            queueSession(new Intent(source).putExtra(AudioEffect.EXTRA_PACKAGE_NAME,owner));
         }
     }
     private void queueSession(Intent command) {
@@ -115,7 +119,7 @@ public class MainActivity extends Activity {
                     state.enabled=false;state.save(this);
                     if(EqService.instance!=null)EqService.instance.shutdown();
                     finish();break;
-                case 7: new AlertDialog.Builder(this).setTitle("Session EQ 0.4.3")
+                case 7: new AlertDialog.Builder(this).setTitle("Session EQ 0.5.1")
                     .setMessage("20-полосный эквалайзер для аудиосессий других плееров.\n\nНезависимая реализация интерфейса, вдохновлённая AIMP. Значения пресетов AIMP Windows указаны отдельно. Иконки: Google Material Icons, Apache 2.0.\n\nКод приложения: Apache 2.0. Обработка — Android DynamicsProcessing; совпадение звучания с AIMP не измерено. Приложение не связано с разработчиками AIMP.\n\nПеретаскивай точки по горизонтали. Удерживай точку или нажми на число для точного ввода.\n\nРазрешение на микрофон и доступ в интернет не требуются.")
                     .setPositiveButton("Закрыть",null).show();break;
                 case 8: appearance();break;
