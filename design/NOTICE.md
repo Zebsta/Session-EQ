@@ -14,3 +14,8 @@ Licensed under Apache License 2.0. The full license is in
 
 `icons-preview.svg` and `icons-preview.png` preview the vector assets under
 launcher masks. They are design previews, not screenshots from a phone.
+
+`interface-preview.svg` and `interface-preview.png` render the equalizer layout,
+palette, vector controls and Rock preset from the application source for the
+README. They are interface illustrations, not captured device screenshots.
+Regenerate with `python3 design/preview_interface.py` (PyGObject/Rsvg and Pycairo).
