@@ -58,13 +58,14 @@ public class EqService extends Service {
         stopSelf();
     }
     public void session(Intent intent) {
+        String owner=intent.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME);
+        if(SessionPolicy.isBlocked(owner))return;
         int id=intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION,0);
         if(id<=0) { record("Пропущен недопустимый ID сессии: "+id); return; }
         if(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())) {
             sessions.forget(id);releaseEffect(id);latest="Сессия "+id+" закрыта";record(latest);
             stopForegroundIfIdle();updateNotification();return;
         }
-        String owner=intent.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME);
         attach(id,owner==null?"Вручную":owner);
     }
     private DynamicsProcessing.Eq eq() {
@@ -73,12 +74,14 @@ public class EqService extends Service {
         return eq;
     }
     public void attach(int id,String owner) {
+        if(id<=0||!SessionPolicy.mayAttach(owner))return;
         state=new EqState(this);
         Integer evicted=sessions.remember(id,owner);
         if(evicted!=null)releaseEffect(evicted);
         reconcile();
     }
     private void createEffect(int id,String owner) {
+        if(!SessionPolicy.mayAttach(owner))return;
         DynamicsProcessing effect=null;
         try {
             ensureForeground();
@@ -160,7 +163,7 @@ public class EqService extends Service {
     }
     public String status() { return latest; }
     public String diagnostics() {
-        StringBuilder b=new StringBuilder("Session EQ 0.4.3\n")
+        StringBuilder b=new StringBuilder("Session EQ 0.5.1\n")
             .append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
             .append(" · Android ").append(Build.VERSION.RELEASE).append("\n\n")
             .append(latest).append("\n\nОбъектов эффектов: ").append(effects.size()).append('\n')

@@ -6,6 +6,9 @@ import android.media.audiofx.AudioEffect;
 
 public class SessionReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context,Intent intent) {
+        String owner=intent.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME);
+        if(SessionPolicy.isBlocked(owner))return;
+        if(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())&&!SessionPolicy.mayAttach(owner))return;
         int session=intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION,0);
         if(session<=0) return;
         if(EqService.instance!=null) { EqService.instance.session(intent); return; }

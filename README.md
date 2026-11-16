@@ -24,6 +24,13 @@ not a device screenshot.*
 
 ## Compatibility and limitations
 
+Version 0.5.1 restores the previous connection flow without DUMP or player
+discovery. Select Session EQ from the player's external equalizer settings.
+AIMP's OPEN and external-panel requests are ignored to avoid cascading two
+equalizers. Explicit numeric session entry remains as an advanced fallback;
+it cannot identify the owner of an arbitrary ID without diagnostic access.
+The optional DUMP-based picker is deferred in PR #3 and is not included.
+
 Android 9+ (API 28). Actual support depends on the device's DynamicsProcessing
 implementation and the source player's audio output path. Creating an enabled
 object does not by itself prove that every output is processed.
