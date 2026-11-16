@@ -1,9 +1,17 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="108" android:viewportHeight="108">
+<vector xmlns:aapt="http://schemas.android.com/aapt" xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="108" android:viewportHeight="108">
   <path android:fillColor="@color/icon_background" android:pathData="M54,2a52,52 0,1 1,0,104a52,52 0,1 1,0,-104" />
   <group android:pivotX="54" android:pivotY="54" android:scaleX="1.42" android:scaleY="1.42">
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="3" android:pathData="M54,25.5a28.5,28.5 0,1 1,0,57a28.5,28.5 0,1 1,0,-57" />
+    <path android:pathData="M54,24a30,30 0,1 1,0,60a30,30 0,1 1,0,-60">
+      <aapt:attr name="android:fillColor">
+        <gradient android:type="radial" android:centerX="54" android:centerY="54" android:gradientRadius="30">
+          <item android:offset="0" android:color="@color/icon_disk_center" />
+          <item android:offset="0.8" android:color="@color/icon_disk_mid" />
+          <item android:offset="1" android:color="@color/icon_disk_edge" />
+        </gradient>
+      </aapt:attr>
+    </path>
     <group android:translateX="36" android:translateY="36" android:scaleX="1.5" android:scaleY="1.5">
-      <path android:fillColor="#FFFFFF" android:pathData="M3,17v2h6v-2H3zM3,5v2h10V5H3zM13,21v-2h8v-2h-8v-2h-2v6h2zM7,9v2H3v2h4v2h2V9H7zM21,13v-2H11v2h10zM15,9h2V7h4V5h-4V3h-2v6z" />
+      <path android:fillColor="@color/icon_foreground" android:pathData="M3,17v2h6v-2H3zM3,5v2h10V5H3zM13,21v-2h8v-2h-8v-2h-2v6h2zM7,9v2H3v2h4v2h2V9H7zM21,13v-2H11v2h10zM15,9h2V7h4V5h-4V3h-2v6z" />
     </group>
   </group>
 </vector>

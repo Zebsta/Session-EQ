@@ -13,7 +13,7 @@ not a device screenshot.*
 
 - 20 frequency bands, ±15 dB gain; balance and preamp.
 - A curve with horizontally draggable band points and precise numeric input.
-- Light/dark/system themes and adaptive sliders-in-a-ring icons.
+- Light/dark/system themes and adaptive icons with black sliders in an orange disk.
 - Screenshot-based Rock, Flat, 24 separately labelled AIMP Windows presets,
   and saved user presets.
 - ON/OFF, optional stereo-linked limiter, and AUTO preamp headroom compensation.
