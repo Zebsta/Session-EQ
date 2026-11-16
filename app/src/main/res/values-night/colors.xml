@@ -11,6 +11,9 @@
     <color name="eq_button_off">#202020</color>
     <color name="eq_on_text">#FFFFFF</color>
     <color name="eq_off_text">#B0B0B0</color>
-    <color name="icon_background">#1B1D1B</color>
-    <color name="icon_foreground">#FFCA00</color>
+    <color name="icon_background">#1A1A1A</color>
+    <color name="icon_foreground">#000000</color>
+    <color name="icon_disk_center">#F7CA00</color>
+    <color name="icon_disk_mid">#F7C000</color>
+    <color name="icon_disk_edge">#F7A200</color>
 </resources>

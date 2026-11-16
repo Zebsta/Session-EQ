@@ -14,7 +14,8 @@ own provenance and applicable terms; no ownership of AIMP is claimed.
 - Settings: https://github.com/google/material-design-icons/blob/master/src/action/settings/materialicons/24px.svg
 
 The SVG paths are adapted into Android vector drawables. The tune glyph is also
-placed inside a ring for launcher, splash, monochrome and notification icons.
+placed inside a circular badge for launcher, splash and monochrome icons, and
+inside an outlined ring for notifications.
 The full upstream license is packaged in the APK as a raw resource.
 
 ## AIMP inspiration and numeric presets
@@ -25,6 +26,8 @@ The full upstream license is packaged in the APK as a raw resource.
 - Preset provenance: [reference/aimp-windows/README.md](reference/aimp-windows/README.md)
 
 The UI is independently implemented from a user-provided reference screenshot.
+The launcher disk uses the original AIMP asset's numeric gradient colors;
+see [design/NOTICE.md](design/NOTICE.md) for the exact palette and source resource.
 The numeric 20-band values shown in that screenshot form the preset named Rock.
 Twenty-four further numeric presets are extracted from the official AIMP Windows
 distribution and are identified in the UI with the `AIMP Windows · ` prefix.
