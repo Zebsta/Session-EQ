@@ -11,5 +11,6 @@
     <color name="eq_button_off">#202020</color>
     <color name="eq_on_text">#FFFFFF</color>
     <color name="eq_off_text">#B0B0B0</color>
-    <color name="icon_background">#C96E00</color>
+    <color name="icon_background">#1B1D1B</color>
+    <color name="icon_foreground">#FFCA00</color>
 </resources>

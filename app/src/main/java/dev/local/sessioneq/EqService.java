@@ -160,7 +160,7 @@ public class EqService extends Service {
     }
     public String status() { return latest; }
     public String diagnostics() {
-        StringBuilder b=new StringBuilder("Session EQ 0.4.1\n")
+        StringBuilder b=new StringBuilder("Session EQ 0.4.2\n")
             .append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
             .append(" · Android ").append(Build.VERSION.RELEASE).append("\n\n")
             .append(latest).append("\n\nОбъектов эффектов: ").append(effects.size()).append('\n')

@@ -4,6 +4,11 @@ The logo combines an original ring arrangement with the Material tune icon,
 following the user's selected design. The former E variant has been removed
 from the current application resources. No AIMP logo file is included.
 
+The regular launcher/splash palette is charcoal (`#1B1D1B`) with golden yellow
+ring and sliders (`#FFCA00`), visually matched to the user's AIMP reference.
+The icon geometry and scale are preserved. Notification and Android-themed
+monochrome variants remain separate masks for system tinting.
+
 The tune and settings icons are from Google's Material Icons project:
 
 - https://github.com/google/material-design-icons/blob/master/src/image/tune/materialicons/24px.svg

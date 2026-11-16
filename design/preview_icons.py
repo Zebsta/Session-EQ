@@ -13,7 +13,7 @@ res = root.parent / 'app/src/main/res'
 ns = '{http://schemas.android.com/apk/res/android}'
 
 def vector_paths(name, fill=None):
-    paths = []
+    colors={node.get('name'):node.text for node in ET.parse(res/'values/colors.xml').getroot()}
     def render(node):
         if node.tag == 'group':
             px,py=node.get(ns+'pivotX','0'),node.get(ns+'pivotY','0')
@@ -28,16 +28,13 @@ def vector_paths(name, fill=None):
             value = path.get(ns + android)
             if value:
                 if value == '#00000000': value = 'none'
-                elif value.startswith('@color/'): value = fill or '#252525'
+                elif value.startswith('@color/'): value = fill or colors[value.split('/')[1]]
                 elif fill and value == '#FFFFFF': value = fill
                 attrs[svg] = value
         return '<path ' + ' '.join(f'{k}="{html.escape(v)}"' for k,v in attrs.items()) + '/>'
     return render(ET.parse(res / 'drawable' / name).getroot())
 
 logo = vector_paths('ic_logo_foreground.xml')
-tune = vector_paths('ic_tune.xml', '#FFFFFF')
-ring = '<circle cx="54" cy="54" r="28.5" fill="none" stroke="white" stroke-width="3"/>'
-tune_logo = ring + '<g transform="translate(36 36) scale(1.5)">' + tune + '</g>'
 
 parts = ['<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="640" viewBox="0 0 1120 640">',
          '<rect width="1120" height="640" fill="#E9E6E0"/>']
@@ -45,7 +42,7 @@ parts = ['<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="640" view
 def text(s,x,y,size,fill,weight='400'):
     parts.append(f'<text x="{x}" y="{y}" font-family="DejaVu Sans,sans-serif" font-size="{size}" font-weight="{weight}" fill="{fill}">{html.escape(s)}</text>')
 
-for i, (bg,fg,muted,orange) in enumerate([('#F5F4F1','#252525','#68645E','#ED8700'),('#383838','#F0F0F0','#B0B0B0','#C96E00')]):
+for i, (bg,fg,muted,icon_background) in enumerate([('#F5F4F1','#252525','#68645E','#1B1D1B'),('#383838','#F0F0F0','#B0B0B0','#1B1D1B')]):
     x = 20+i*550
     parts.append(f'<rect x="{x}" y="20" width="530" height="600" rx="24" fill="{bg}"/>')
     text('Светлая тема' if i==0 else 'Тёмная тема',x+28,65,23,fg,'600')
@@ -54,7 +51,7 @@ for i, (bg,fg,muted,orange) in enumerate([('#F5F4F1','#252525','#68645E','#ED870
         parts.append(f'<svg x="{xx}" y="100" width="160" height="160" viewBox="18 18 72 72">')
         radius=18 if j==0 else 36
         parts.append(f'<defs><clipPath id="mask{i}{j}"><rect x="18" y="18" width="72" height="72" rx="{radius}"/></clipPath></defs>')
-        parts.append(f'<g clip-path="url(#mask{i}{j})"><rect x="18" y="18" width="72" height="72" fill="{orange}"/>{paths}</g></svg>')
+        parts.append(f'<g clip-path="url(#mask{i}{j})"><rect x="18" y="18" width="72" height="72" fill="{icon_background}"/>{paths}</g></svg>')
         text(label,xx-1,292,18,fg)
     text('Тематическая иконка Android',x+28,350,17,muted)
     parts.append(f'<svg x="{x+48}" y="370" width="80" height="80" viewBox="18 18 72 72"><rect x="18" y="18" width="72" height="72" rx="36" fill="'+('#E4D3B8' if i==0 else '#53432C')+'"/>'+vector_paths('ic_logo_foreground.xml', '#543300' if i==0 else '#FFDAA0')+'</svg>')
