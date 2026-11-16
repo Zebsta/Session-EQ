@@ -4,7 +4,10 @@ An independent, open-source 20-band Android equalizer for audio sessions from
 other music players. Inspired by the AIMP equalizer interface, implemented in
 Java using Android DynamicsProcessing.
 
-![Session EQ icons in light and dark themes](design/icons-preview.png)
+![Session EQ equalizer interface in dark and light themes](design/interface-preview.png)
+
+*Interface preview rendered from the app's layout, colors and Rock preset;
+not a device screenshot.*
 
 ## Features
 
