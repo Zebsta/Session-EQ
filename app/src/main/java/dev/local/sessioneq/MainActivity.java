@@ -22,6 +22,7 @@ public class MainActivity extends Activity {
     private Map<Integer,String> pendingSelection;
     private int scanGeneration;
     private boolean scanRunning;
+    private String lastScan="Поиск ещё не выполнялся";
     private AlertDialog scanDialog;
     private final ArrayDeque<Intent> pendingSessions=new ArrayDeque<>();
     private final Handler handler=new Handler(Looper.getMainLooper());
@@ -128,7 +129,7 @@ public class MainActivity extends Activity {
                     state.enabled=false;state.save(this);
                     if(EqService.instance!=null)EqService.instance.shutdown();
                     finish();break;
-                case 7: new AlertDialog.Builder(this).setTitle("Session EQ 0.5.2")
+                case 7: new AlertDialog.Builder(this).setTitle("Session EQ 0.5.3")
                     .setMessage("20-полосный эквалайзер для аудиосессий других плееров.\n\nНезависимая реализация интерфейса, вдохновлённая AIMP. Значения пресетов AIMP Windows указаны отдельно. Иконки: Google Material Icons, Apache 2.0.\n\nКод приложения: Apache 2.0. Обработка — Android DynamicsProcessing; совпадение звучания с AIMP не измерено. Приложение не связано с разработчиками AIMP.\n\nПеретаскивай точки по горизонтали. Удерживай точку или нажми на число для точного ввода.\n\nРазрешение на микрофон и доступ в интернет не требуются.")
                     .setPositiveButton("Закрыть",null).show();break;
                 case 8: appearance();break;
@@ -176,10 +177,14 @@ public class MainActivity extends Activity {
                 scanRunning=false;
                 if(request!=scanGeneration||isFinishing()||isDestroyed())return;
                 progress.dismiss();scanDialog=null;
-                if(failure instanceof SecurityException){discoveryAccess();return;}
-                if(failure!=null){new AlertDialog.Builder(this).setTitle("Поиск плееров")
+                if(failure instanceof SecurityException&&!PlayerDirectory.hasAccess(MainActivity.this)){discoveryAccess();return;}
+                if(failure!=null){
+                    lastScan=failure.getClass().getSimpleName()+": "+failure.getMessage();
+                    android.util.Log.w("SessionEQ", "Player discovery failed", failure);
+                    new AlertDialog.Builder(this).setTitle("Поиск плееров")
                     .setMessage(failure.getMessage()==null?"Не удалось прочитать список проигрывателей.":failure.getMessage())
                     .setPositiveButton("Закрыть",null).setNeutralButton("Повторить",(d,w)->connect()).show();return;}
+                lastScan="Поиск завершён: плееров "+result.size();
                 if(selected==null){showPlayers(result);return;}
                 for(PlayerDirectory.Player current:result)
                     if(current.uid==selected.uid&&current.packageName.equals(selected.packageName)){attachPlayer(current);return;}
@@ -248,7 +253,7 @@ public class MainActivity extends Activity {
     }
     public void diagnostics() {
         EqService service=EqService.instance;
-        String message="Доступ DUMP: "+(PlayerDirectory.hasAccess(this)?"выдан":"не выдан")+"\n\n"+(service==null?"Нет подключённой службы. Открой экран приложения заново.":service.diagnostics());
+        String message="Доступ DUMP: "+(PlayerDirectory.hasAccess(this)?"выдан":"не выдан")+"\n"+lastScan+"\n\n"+(service==null?"Нет подключённой службы. Открой экран приложения заново.":service.diagnostics());
         ScrollView scroll=new ScrollView(this);TextView text=note(message);text.setTextIsSelectable(true);
         text.setPadding(32,16,32,16);scroll.addView(text);
         new AlertDialog.Builder(this).setTitle("Диагностика").setView(scroll).setPositiveButton("Закрыть",null)

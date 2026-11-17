@@ -5,14 +5,21 @@ import android.content.Context;
 import android.content.pm.*;
 import android.os.Debug;
 import android.os.Process;
+import android.os.ParcelFileDescriptor;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.text.Collator;
 import java.util.*;
+import java.util.concurrent.*;
 
 /** On-demand discovery, with no notification listener, root or background timer. */
 public final class PlayerDirectory {
     private static final int MAX_DUMP_BYTES=2*1024*1024;
+    // At most two workers, created only for a scan and retired after five idle seconds.
+    private static final ThreadPoolExecutor DUMP_WORKERS=new ThreadPoolExecutor(
+        0,2,5,TimeUnit.SECONDS,new SynchronousQueue<Runnable>(),task->{
+            Thread worker=new Thread(task,"session-eq-audio-dump");worker.setDaemon(true);return worker;
+        });
     public static final class Player {
         public final String packageName,label;
         public final int uid;
@@ -29,7 +36,7 @@ public final class PlayerDirectory {
     }
     public static List<Player> query(Context context) throws IOException {
         if(!hasAccess(context))throw new SecurityException("DUMP permission required");
-        String snapshot=readSnapshot(context);
+        String snapshot=readSnapshot();
         if(!AudioDumpParser.recognizes(snapshot))throw new IOException("Android не предоставил список звуковых потоков в поддерживаемом формате.");
         PackageManager pm=context.getPackageManager();Map<String,Player> players=new LinkedHashMap<>();
         for(AudioDumpParser.Track track:AudioDumpParser.parse(snapshot)) {
@@ -47,24 +54,49 @@ public final class PlayerDirectory {
         List<Player> out=new ArrayList<>(players.values());Collator collator=Collator.getInstance();
         out.sort((a,b)->collator.compare(a.label,b.label));return out;
     }
-    private static String readSnapshot(Context context) throws IOException {
-        // A private temporary file avoids blocking the synchronous binder dump on
-        // an unread pipe. The snapshot is discarded and never included in logs.
-        File file=File.createTempFile("session-eq-audio-", ".tmp",context.getCacheDir());
+    private static String readSnapshot() throws IOException {
+        // A system service may not write to an app-private file even with DUMP.
+        // Drain a pipe concurrently with the Binder dump, including dumps larger
+        // than the pipe buffer, and bound both memory and waiting time.
+        ParcelFileDescriptor[] pipe=ParcelFileDescriptor.createPipe();
+        Future<String> reader=null;Future<Boolean> writer=null;
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
         try {
-            try(FileOutputStream output=new FileOutputStream(file)) {
-                if(!Debug.dumpService("audio",output.getFD(),new String[0]))
-                    throw new IOException("Не удалось получить список звуковых потоков.");
-            }
-            if(file.length()>MAX_DUMP_BYTES)throw new IOException("Список звуковых потоков слишком большой.");
-            try(InputStream input=new FileInputStream(file);ByteArrayOutputStream bytes=new ByteArrayOutputStream()) {
-                byte[] buffer=new byte[8192];int count,total=0;
-                while((count=input.read(buffer))!=-1) {
-                    total+=count;if(total>MAX_DUMP_BYTES)throw new IOException("Список звуковых потоков слишком большой.");
-                    bytes.write(buffer,0,count);
+            reader=DUMP_WORKERS.submit(()->{
+                try(InputStream input=new ParcelFileDescriptor.AutoCloseInputStream(pipe[0]);
+                    ByteArrayOutputStream bytes=new ByteArrayOutputStream()) {
+                    byte[] buffer=new byte[8192];int count,total=0;
+                    while((count=input.read(buffer))!=-1) {
+                        total+=count;
+                        if(total>MAX_DUMP_BYTES)throw new IOException("Список звуковых потоков слишком большой.");
+                        bytes.write(buffer,0,count);
+                    }
+                    return new String(bytes.toByteArray(),StandardCharsets.UTF_8);
                 }
-                return new String(bytes.toByteArray(),StandardCharsets.UTF_8);
-            }
-        } finally {if(!file.delete())file.deleteOnExit();}
+            });
+            writer=DUMP_WORKERS.submit(()->{
+                try(ParcelFileDescriptor output=pipe[1]) {
+                    return Debug.dumpService("audio",output.getFileDescriptor(),new String[0]);
+                }
+            });
+            String snapshot=reader.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS);
+            if(!writer.get(Math.max(1,deadline-System.nanoTime()),TimeUnit.NANOSECONDS))
+                throw new IOException("AudioService не предоставил аудиодамп.");
+            return snapshot;
+        } catch(TimeoutException failure) {
+            throw new IOException("AudioService не ответил за 5 секунд. Повтори поиск.",failure);
+        } catch(RejectedExecutionException failure) {
+            throw new IOException("Предыдущий запрос к AudioService ещё выполняется.",failure);
+        } catch(InterruptedException failure) {
+            Thread.currentThread().interrupt();throw new IOException("Поиск прерван.",failure);
+        } catch(ExecutionException failure) {
+            Throwable cause=failure.getCause();
+            throw new IOException("Не удалось прочитать AudioService: "+cause.getClass().getSimpleName()+
+                (cause.getMessage()==null?"":": "+cause.getMessage()),cause);
+        } finally {
+            if(reader!=null)reader.cancel(true);
+            if(writer!=null)writer.cancel(true);
+            for(ParcelFileDescriptor end:pipe)try{end.close();}catch(IOException ignored){}
+        }
     }
 }
