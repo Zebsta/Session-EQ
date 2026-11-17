@@ -1,3 +1,9 @@
+> **Тестовая ветка для сравнения AIMP и Session EQ.**
+> APK: `Session-EQ-0.6.1-aimp-test.apk`. Подключение AIMP намеренно разрешено.
+> При проверке нашего EQ выключай встроенный EQ AIMP и наоборот.
+> Это не публичный релиз; `main` и версия 0.6.1 по-прежнему исключают AIMP.
+> Инструкция записи и анализа: [Audio lab](tools/audio-lab/README.md).
+
 # Session EQ
 
 [![Android build](https://github.com/Zebsta/Session-EQ/actions/workflows/android.yml/badge.svg)](https://github.com/Zebsta/Session-EQ/actions/workflows/android.yml)

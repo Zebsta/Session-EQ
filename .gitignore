@@ -9,3 +9,8 @@ dist/
 .idea/
 .DS_Store
 reference/aimp-windows/*.zip
+
+# Private audio comparison data
+tools/audio-lab/recordings/
+tools/audio-lab/reports/
+__pycache__/

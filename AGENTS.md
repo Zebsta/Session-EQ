@@ -13,7 +13,11 @@ framework views and DynamicsProcessing; there are no application dependencies.
   auto-connect mode may retain a quiet foreground service with no effects while
   ON and waiting for selected players; do not scan repeatedly during that wait.
 - Do not change filter parameters while doing unrelated UI work.
-- AIMP OPEN/external-panel requests must not create effects. Preserve SessionPolicy.
+- This isolated test branch intentionally permits AIMP sessions at the user's
+  explicit request for audio comparison. Main/released builds still block AIMP.
+  Do not merge this bypass into main. Preserve self/invalid/shared-UID checks.
+- VersionCode stays 14, equal to base 0.6.1, with the same application ID and key,
+  so the test APK and original 0.6.1 can replace one another without clearing data.
 - DUMP-based discovery was resumed at the user's request for version 0.5.2.
   Keep scans on demand and keep ordinary external-player integration usable
   without DUMP. Do not require discovery for the ON/OFF toggle.

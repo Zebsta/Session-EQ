@@ -127,7 +127,7 @@ public class MainActivity extends Activity {
                     state.enabled=false;state.save(this);
                     if(EqService.instance!=null)EqService.instance.shutdown();
                     finish();break;
-                case 6: new AlertDialog.Builder(this).setTitle("Session EQ 0.6.1")
+                case 6: new AlertDialog.Builder(this).setTitle("Session EQ 0.6.1-aimp-test")
                     .setMessage("20-полосный эквалайзер для аудиосессий других плееров.\n\nНезависимая реализация интерфейса, вдохновлённая AIMP. Значения пресетов AIMP Windows указаны отдельно. Иконки: Google Material Icons, Apache 2.0.\n\nКод приложения: Apache 2.0. Обработка — Android DynamicsProcessing; совпадение звучания с AIMP не измерено. Приложение не связано с разработчиками AIMP.\n\nПеретаскивай точки по горизонтали. Удерживай точку или нажми на число для точного ввода.\n\nРазрешение на микрофон и доступ в интернет не требуются.")
                     .setPositiveButton("Закрыть",null).show();break;
                 case 7: appearance();break;
@@ -215,7 +215,7 @@ public class MainActivity extends Activity {
         }
         if(players.isEmpty()) {
             new AlertDialog.Builder(this).setTitle("Нет играющих плееров")
-                .setMessage("Запусти музыку и обнови список. AIMP исключён: у него есть собственный эквалайзер.")
+                .setMessage("Запусти музыку и обнови список. В этой тестовой сборке AIMP разрешён.")
                 .setPositiveButton("Обновить",(d,w)->connect()).setNegativeButton("Закрыть",null).show();return;
         }
         ArrayAdapter<PlayerDirectory.Player> adapter=new ArrayAdapter<PlayerDirectory.Player>(this,android.R.layout.simple_list_item_2,players){
@@ -251,7 +251,7 @@ public class MainActivity extends Activity {
             }
         };
         ListView list=new ListView(this);list.setAdapter(adapter);
-        LinearLayout box=column();box.addView(note("Нажми на плеер для подключения сейчас. «Авто» запоминает приложение и подключает его новые сессии. При ON остаётся тихое уведомление ожидания. AIMP исключён."));
+        LinearLayout box=column();box.addView(note("Нажми на плеер для подключения сейчас. «Авто» запоминает приложение и подключает его новые сессии. При ON остаётся тихое уведомление ожидания. AIMP разрешён для теста: выключи его встроенный EQ при использовании Session EQ."));
         box.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         AlertDialog chooser=new AlertDialog.Builder(this).setTitle("Подключение плееров").setView(box)
             .setNeutralButton("Обновить",(d,w)->{

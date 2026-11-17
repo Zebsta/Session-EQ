@@ -28,18 +28,18 @@ public class PlayerDiscoveryTest {
         check(AudioDumpParser.parse(track(204,10375,"started","VOICE_COMMUNICATION")).isEmpty(),"Calls must be excluded");
         check(AudioDumpParser.parse(track(205,10375,"started","MEDIA")+track(205,10376,"started","MEDIA")+
             track(205,10375,"started","MEDIA")).isEmpty(),"A session shared by different owners must never be guessed");
-        check(!SessionPolicy.mayAttach("com.aimp.player"),"AIMP blocked");
-        check(!SessionPolicy.mayAttach("com.aimp.player.beta"),"AIMP variant blocked");
-        check(!SessionPolicy.mayAttach(" com.aimp.player "),"Whitespace must not bypass AIMP exclusion");
+        check(SessionPolicy.mayAttach("com.aimp.player"),"AIMP permitted for test");
+        check(SessionPolicy.mayAttach("com.aimp.player.beta"),"AIMP variant permitted for test");
+        check(SessionPolicy.mayAttach(" com.aimp.player "),"Trimmed AIMP permitted for test");
         check(!SessionPolicy.mayAttach(null)&&!SessionPolicy.mayAttach(""),"Unknown owners cannot be attached");
         check(!SessionPolicy.mayAttach("dev.local.sessioneq"),"Self excluded");
         check(SessionPolicy.mayAttach("ru.yandex.music")&&SessionPolicy.mayAttach("com.spotify.music"),"Other players allowed");
         check(SessionPolicy.singleOwner(new String[]{"ru.yandex.music"}).equals("ru.yandex.music"),"Resolve known owner");
-        check(SessionPolicy.singleOwner(new String[]{"com.aimp.player"})==null,"AIMP must never be listed");
+        check("com.aimp.player".equals(SessionPolicy.singleOwner(new String[]{"com.aimp.player"})),"AIMP must be listed in comparison build");
         check(SessionPolicy.singleOwner(new String[]{"ru.yandex.music","com.aimp.player"})==null,"Shared AIMP UID excluded");
         check(SessionPolicy.singleOwner(null)==null&&SessionPolicy.singleOwner(new String[0])==null,"Unresolved UID excluded");
         SessionRegistry registry=new SessionRegistry();registry.remember(500,"ru.yandex.music");
-        try {registry.remember(501,"com.aimp.player");throw new AssertionError("Registry accepted AIMP");}
+        try {registry.remember(501,"dev.local.sessioneq");throw new AssertionError("Registry accepted self");}
         catch(IllegalArgumentException expected){}
         check(registry.snapshot().size()==1,"Blocked owner must not disturb an allowed session");
         System.out.println("Player discovery: active/current parsing, wrapped records, stale/invalid/call exclusion and AIMP policy passed");

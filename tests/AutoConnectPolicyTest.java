@@ -14,8 +14,8 @@ public class AutoConnectPolicyTest {
         check(AutoConnectPolicy.acceptOpen(true,selected,"com.spotify.music",true),"Manual connection must retain player integration");
         check(!AutoConnectPolicy.acceptOpen(false,selected,"ru.yandex.music",true),"Incoming OPEN must not override OFF");
         selected.add("com.aimp.player");
-        check(!AutoConnectPolicy.acceptOpen(true,selected,"com.aimp.player",true),"AIMP must stay excluded even with stale preferences");
-        check(!AutoConnectPolicy.keepWaiting(true,Collections.singleton("com.aimp.player")),"Invalid selection must not retain service");
+        check(AutoConnectPolicy.acceptOpen(true,selected,"com.aimp.player",true),"AIMP is permitted only in comparison build");
+        check(!AutoConnectPolicy.keepWaiting(true,Collections.singleton("dev.local.sessioneq")),"Invalid selection must not retain service");
         SessionRegistry sessions=new SessionRegistry();
         if(AutoConnectPolicy.acceptOpen(true,selected,"ru.yandex.music",false))sessions.remember(101,"ru.yandex.music");
         sessions.forget(101);
@@ -24,6 +24,6 @@ public class AutoConnectPolicyTest {
         check(sessions.snapshot().containsKey(202)&&!sessions.snapshot().containsKey(101),"Restarted player must use new session ID");
         selected.clear();
         check(!AutoConnectPolicy.acceptOpen(true,selected,"ru.yandex.music",false),"Unchecking auto-only player must prevent next automatic connection, even before old CLOSE");
-        System.out.println("Auto-connect: selected players, OFF/STOP, final CLOSE, replacement session and AIMP exclusion passed");
+        System.out.println("Auto-connect: selected players, OFF/STOP, final CLOSE, replacement session and comparison AIMP permission passed");
     }
 }
