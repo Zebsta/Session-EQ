@@ -12,4 +12,7 @@ public final class SessionPolicy {
     public static boolean mayAttach(String owner) {
         return owner!=null&&!owner.trim().isEmpty()&&!isBlocked(owner);
     }
+    public static String singleOwner(String[] packages) {
+        return packages!=null&&packages.length==1&&mayAttach(packages[0])?packages[0]:null;
+    }
 }

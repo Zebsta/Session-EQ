@@ -24,7 +24,7 @@ public class EqService extends Service {
     private final ArrayDeque<String> history=new ArrayDeque<>();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private EqState state;
-    private String latest="Ожидание аудиосессии. Перезапусти воспроизведение или укажи ID в меню.";
+    private String latest="Выбери проигрыватель в меню подключения.";
 
     public static void channel(Context c) {
         NotificationChannel channel=new NotificationChannel(CHANNEL,"Эквалайзер",NotificationManager.IMPORTANCE_LOW);
@@ -42,6 +42,16 @@ public class EqService extends Service {
     public void addListener(Listener listener){listeners.add(listener);listener.onStatusChanged();}
     public void removeListener(Listener listener){listeners.remove(listener);}
     public boolean isEnabled(){return state.enabled;}
+    public boolean hasSessions(){return !sessions.isEmpty();}
+    public boolean connectSelected(Map<Integer,String> selected) {
+        if(selected.isEmpty())return false;
+        for(Map.Entry<Integer,String> entry:selected.entrySet())
+            if(entry.getKey()<=0||!SessionPolicy.mayAttach(entry.getValue()))return false;
+        for(Integer id:new ArrayList<>(effects.keySet()))releaseEffect(id);
+        sessions.clear();
+        for(Map.Entry<Integer,String> entry:selected.entrySet())sessions.remember(entry.getKey(),entry.getValue());
+        state=new EqState(this);reconcile();return !effects.isEmpty();
+    }
     public void applySettings(){state=new EqState(this);reconcile();}
     private void ensureForeground() {
         if(foreground)return;
@@ -66,7 +76,8 @@ public class EqService extends Service {
             sessions.forget(id);releaseEffect(id);latest="Сессия "+id+" закрыта";record(latest);
             stopForegroundIfIdle();updateNotification();return;
         }
-        attach(id,owner==null?"Вручную":owner);
+        if(!SessionPolicy.mayAttach(owner))return;
+        attach(id,owner);
     }
     private DynamicsProcessing.Eq eq() {
         DynamicsProcessing.Eq eq=new DynamicsProcessing.Eq(true,true,20);
@@ -135,7 +146,7 @@ public class EqService extends Service {
             latest="OFF · Аудиоэффекты освобождены";
             stopForegroundIfIdle();updateNotification();return;
         }
-        if(sessions.isEmpty())latest="Ожидание аудиосессии. Запусти плеер или укажи ID в меню.";
+        if(sessions.isEmpty())latest="Выбери проигрыватель в меню подключения.";
         for(Map.Entry<Integer,String> entry:sessions.snapshot().entrySet()) {
             DynamicsProcessing effect=effects.get(entry.getKey());
             if(effect==null){createEffect(entry.getKey(),entry.getValue());continue;}
@@ -163,7 +174,7 @@ public class EqService extends Service {
     }
     public String status() { return latest; }
     public String diagnostics() {
-        StringBuilder b=new StringBuilder("Session EQ 0.5.1\n")
+        StringBuilder b=new StringBuilder("Session EQ 0.5.4\n")
             .append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
             .append(" · Android ").append(Build.VERSION.RELEASE).append("\n\n")
             .append(latest).append("\n\nОбъектов эффектов: ").append(effects.size()).append('\n')

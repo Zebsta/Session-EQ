@@ -19,6 +19,11 @@ public class MainActivity extends Activity {
     private boolean stopping;
     private boolean bound,dirty;
     private EqService service;
+    private Map<Integer,String> pendingSelection;
+    private int scanGeneration;
+    private boolean scanRunning;
+    private String lastScan="Поиск ещё не выполнялся";
+    private AlertDialog scanDialog;
     private final ArrayDeque<Intent> pendingSessions=new ArrayDeque<>();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final Runnable apply=this::flushChanges;
@@ -28,6 +33,10 @@ public class MainActivity extends Activity {
             service=((EqService.LocalBinder)binder).getService();
             flushChanges();service.addListener(statusListener);
             while(!pendingSessions.isEmpty())service.session(pendingSessions.removeFirst());
+            if(pendingSelection!=null){
+                boolean connected=service.connectSelected(pendingSelection);pendingSelection=null;
+                if(!connected)connectionFailed();
+            }
         }
         @Override public void onServiceDisconnected(ComponentName name) {
             service=null;view.setStatus("Служба остановлена");
@@ -90,6 +99,7 @@ public class MainActivity extends Activity {
         super.onStart();bound=bindService(new Intent(this,EqService.class),connection,Context.BIND_AUTO_CREATE);
     }
     @Override protected void onStop(){
+        scanGeneration++;if(scanDialog!=null){scanDialog.dismiss();scanDialog=null;}
         handler.removeCallbacks(apply);if(!stopping)flushChanges();
         if(service!=null)service.removeListener(statusListener);
         if(bound){unbindService(connection);bound=false;}service=null;
@@ -119,7 +129,7 @@ public class MainActivity extends Activity {
                     state.enabled=false;state.save(this);
                     if(EqService.instance!=null)EqService.instance.shutdown();
                     finish();break;
-                case 7: new AlertDialog.Builder(this).setTitle("Session EQ 0.5.1")
+                case 7: new AlertDialog.Builder(this).setTitle("Session EQ 0.5.4")
                     .setMessage("20-полосный эквалайзер для аудиосессий других плееров.\n\nНезависимая реализация интерфейса, вдохновлённая AIMP. Значения пресетов AIMP Windows указаны отдельно. Иконки: Google Material Icons, Apache 2.0.\n\nКод приложения: Apache 2.0. Обработка — Android DynamicsProcessing; совпадение звучания с AIMP не измерено. Приложение не связано с разработчиками AIMP.\n\nПеретаскивай точки по горизонтали. Удерживай точку или нажми на число для точного ввода.\n\nРазрешение на микрофон и доступ в интернет не требуются.")
                     .setPositiveButton("Закрыть",null).show();break;
                 case 8: appearance();break;
@@ -138,6 +148,91 @@ public class MainActivity extends Activity {
             }).setNegativeButton("Отмена",null).show();
     }
     public void connect() {
+        if(!PlayerDirectory.hasAccess(this)){discoveryAccess();return;}
+        scanPlayers(null);
+    }
+    private void discoveryAccess() {
+        final String command="adb shell pm grant dev.local.sessioneq android.permission.DUMP";
+        new AlertDialog.Builder(this).setTitle("Настройка поиска плееров")
+            .setMessage("Для поиска уже играющих плееров Android требует разовый доступ к диагностике аудио. На компьютере с USB-отладкой выполни:\n\n"+command+"\n\nЗатем нажми «Подключить аудиосессию» ещё раз. Поиск выполняется только по нажатию. Доступ к уведомлениям и микрофону не нужен.")
+            .setPositiveButton("Понятно",null).setNegativeButton("Ввести ID вручную",(d,w)->connectManual()).setNeutralButton("Скопировать команду",(d,w)->{
+                ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Session EQ",command));
+            }).show();
+    }
+    private void scanPlayers(PlayerDirectory.Player selected) {
+        if(scanRunning){Toast.makeText(this,"Поиск плееров ещё выполняется",Toast.LENGTH_SHORT).show();return;}
+        scanRunning=true;
+        final int request=++scanGeneration;
+        LinearLayout box=column();ProgressBar spinner=new ProgressBar(this);box.addView(spinner);
+        box.addView(note(selected==null?"Поиск проигрывателей…":"Проверка выбранного проигрывателя…"));
+        AlertDialog progress=new AlertDialog.Builder(this).setTitle("Подключить аудиосессию").setView(box)
+            .setNegativeButton("Отмена",(d,w)->scanGeneration++).create();
+        progress.setOnCancelListener(d->scanGeneration++);scanDialog=progress;progress.show();
+        android.content.Context app=getApplicationContext();
+        Thread worker=new Thread(()->{
+            List<PlayerDirectory.Player> found=null;Exception error=null;
+            try {found=PlayerDirectory.query(app);}catch(Exception failure){error=failure;}
+            final List<PlayerDirectory.Player> result=found;final Exception failure=error;
+            runOnUiThread(()->{
+                scanRunning=false;
+                if(request!=scanGeneration||isFinishing()||isDestroyed())return;
+                progress.dismiss();scanDialog=null;
+                if(failure instanceof SecurityException&&!PlayerDirectory.hasAccess(MainActivity.this)){discoveryAccess();return;}
+                if(failure!=null){
+                    lastScan=failure.getClass().getSimpleName()+": "+failure.getMessage();
+                    android.util.Log.w("SessionEQ", "Player discovery failed", failure);
+                    new AlertDialog.Builder(this).setTitle("Поиск плееров")
+                    .setMessage(failure.getMessage()==null?"Не удалось прочитать список проигрывателей.":failure.getMessage())
+                    .setPositiveButton("Закрыть",null).setNeutralButton("Повторить",(d,w)->connect()).show();return;}
+                lastScan="Поиск завершён: плееров "+result.size();
+                if(selected==null){showPlayers(result);return;}
+                for(PlayerDirectory.Player current:result)
+                    if(current.uid==selected.uid&&current.packageName.equals(selected.packageName)){attachPlayer(current);return;}
+                new AlertDialog.Builder(this).setTitle("Воспроизведение остановлено")
+                    .setMessage("Запусти музыку в выбранном плеере и обнови список.")
+                    .setPositiveButton("Обновить",(d,w)->connect()).setNegativeButton("Закрыть",null).show();
+            });
+        },"session-eq-player-scan");worker.setDaemon(true);worker.start();
+    }
+    private void showPlayers(List<PlayerDirectory.Player> players) {
+        if(players.isEmpty()) {
+            new AlertDialog.Builder(this).setTitle("Нет играющих плееров")
+                .setMessage("Запусти музыку и обнови список. AIMP исключён: у него есть собственный эквалайзер.")
+                .setPositiveButton("Обновить",(d,w)->connect()).setNegativeButton("Закрыть",null).show();return;
+        }
+        ArrayAdapter<PlayerDirectory.Player> adapter=new ArrayAdapter<PlayerDirectory.Player>(this,android.R.layout.simple_list_item_2,players){
+            @Override public View getView(int position,View reusable,ViewGroup parent) {
+                PlayerDirectory.Player player=getItem(position);
+                LinearLayout row=new LinearLayout(MainActivity.this);row.setGravity(Gravity.CENTER_VERTICAL);
+                int pad=(int)(16*getResources().getDisplayMetrics().density);row.setPadding(pad,pad/2,pad,pad/2);
+                ImageView icon=new ImageView(MainActivity.this);row.addView(icon,new LinearLayout.LayoutParams(pad*3,pad*3));
+                try {icon.setImageDrawable(getPackageManager().getApplicationIcon(player.packageName));}
+                catch(PackageManager.NameNotFoundException ignored){}
+                LinearLayout words=new LinearLayout(MainActivity.this);words.setOrientation(LinearLayout.VERTICAL);words.setPadding(pad,0,0,0);
+                TextView title=new TextView(MainActivity.this);title.setText(player.label);title.setTextSize(17);words.addView(title);
+                TextView detail=new TextView(MainActivity.this);detail.setText(player.sessionIds.size()>1?"Воспроизводится · несколько потоков":"Сейчас воспроизводит звук");
+                detail.setTextSize(13);words.addView(detail);row.addView(words,new LinearLayout.LayoutParams(0,-2,1));return row;
+            }
+        };
+        new AlertDialog.Builder(this).setTitle("Выбрать проигрыватель")
+            .setAdapter(adapter,(d,which)->scanPlayers(players.get(which)))
+            .setNeutralButton("Обновить",(d,w)->connect()).setNegativeButton("Отмена",null).show();
+    }
+    private void attachPlayer(PlayerDirectory.Player player) {
+        if(!SessionPolicy.mayAttach(player.packageName))return;
+        handler.removeCallbacks(apply);state.enabled=true;state.save(this);dirty=false;
+        if(service!=null) {
+            if(!service.connectSelected(player.sessions())){connectionFailed();view.invalidate();return;}
+            Toast.makeText(this,"Подключено: "+player.label,Toast.LENGTH_SHORT).show();
+        } else pendingSelection=player.sessions();
+        view.invalidate();
+    }
+    private void connectionFailed() {
+        new AlertDialog.Builder(this).setTitle("Не удалось подключить эквалайзер")
+            .setMessage(service==null?"Открой экран приложения ещё раз.":service.status())
+            .setPositiveButton("Закрыть",null).setNeutralButton("Диагностика",(d,w)->diagnostics()).show();
+    }
+    private void connectManual() {
         LinearLayout box=column();
         box.addView(note("Запусти музыку и укажи текущий ID аудиосессии. При перезапуске плеера он может измениться.\n\nДля автоматического подключения выбери Session EQ как внешний эквалайзер в плеере и возобнови воспроизведение."));
         EditText input=new EditText(this);input.setInputType(InputType.TYPE_CLASS_NUMBER);input.setHint("ID аудиосессии");
@@ -158,7 +253,7 @@ public class MainActivity extends Activity {
     }
     public void diagnostics() {
         EqService service=EqService.instance;
-        String message=service==null?"Нет подключённой службы. Открой экран приложения заново.":service.diagnostics();
+        String message="Доступ DUMP: "+(PlayerDirectory.hasAccess(this)?"выдан":"не выдан")+"\n"+lastScan+"\n\n"+(service==null?"Нет подключённой службы. Открой экран приложения заново.":service.diagnostics());
         ScrollView scroll=new ScrollView(this);TextView text=note(message);text.setTextIsSelectable(true);
         text.setPadding(32,16,32,16);scroll.addView(text);
         new AlertDialog.Builder(this).setTitle("Диагностика").setView(scroll).setPositiveButton("Закрыть",null)

@@ -12,8 +12,9 @@ framework views and DynamicsProcessing; there are no application dependencies.
   wake locks or foreground service when OFF or without native effects.
 - Do not change filter parameters while doing unrelated UI work.
 - AIMP OPEN/external-panel requests must not create effects. Preserve SessionPolicy.
-- The DUMP-based player picker is deferred at the user's request. Do not restore
-  it or its diagnostic permission unless the user explicitly asks to resume it.
+- DUMP-based discovery was resumed at the user's request for version 0.5.2.
+  Keep scans on demand and keep ordinary external-player integration usable
+  without DUMP. Do not require discovery for the ON/OFF toggle.
 - Run `./gradlew verifyCore :app:assembleDebug` for implementation changes.
 - Actual audio behavior and battery use require device testing; distinguish local
   checks from measured device results.
