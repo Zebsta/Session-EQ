@@ -22,7 +22,6 @@ public class MainActivity extends Activity {
     private Map<Integer,String> pendingSelection;
     private int scanGeneration;
     private boolean scanRunning;
-    private String lastScan="Поиск ещё не выполнялся";
     private AlertDialog scanDialog;
     private final ArrayDeque<Intent> pendingSessions=new ArrayDeque<>();
     private final Handler handler=new Handler(Looper.getMainLooper());
@@ -113,26 +112,25 @@ public class MainActivity extends Activity {
     }
     private TextView note(String message){TextView t=new TextView(this);t.setText(message);t.setTextSize(14);t.setPadding(0,8,0,12);return t;}
     public void menu() {
-        String[] options={"Подключить аудиосессию","Диагностика подключения","Пресеты","Сохранить пресет",state.limiter?"Лимитер: включён":"Лимитер: выключен","Что делает AUTO","Остановить службу","О приложении","Оформление"};
+        String[] options={"Подключить аудиосессию","Пресеты","Сохранить пресет",state.limiter?"Лимитер: включён":"Лимитер: выключен","Что делает AUTO","Остановить службу","О приложении","Оформление"};
         new AlertDialog.Builder(this).setTitle("Session EQ").setItems(options,(d,which)->{
             switch(which) {
                 case 0: connect();break;
-                case 1: diagnostics();break;
-                case 2: presets();break;
-                case 3: savePreset();break;
-                case 4: state.limiter=!state.limiter;changed();break;
-                case 5: new AlertDialog.Builder(this).setTitle("AUTO")
+                case 1: presets();break;
+                case 2: savePreset();break;
+                case 3: state.limiter=!state.limiter;changed();break;
+                case 4: new AlertDialog.Builder(this).setTitle("AUTO")
                     .setMessage("AUTO уменьшает входное усиление с учётом самой усиленной полосы, чтобы оставить запас до перегрузки. Значение ползунка предусиления сохраняется. Это собственная реализация, её поведение может отличаться от AIMP.")
                     .setPositiveButton("Понятно",null).show();break;
-                case 6:
+                case 5:
                     flushChanges();stopping=true;handler.removeCallbacks(apply);
                     state.enabled=false;state.save(this);
                     if(EqService.instance!=null)EqService.instance.shutdown();
                     finish();break;
-                case 7: new AlertDialog.Builder(this).setTitle("Session EQ 0.6.0")
+                case 6: new AlertDialog.Builder(this).setTitle("Session EQ 0.6.1")
                     .setMessage("20-полосный эквалайзер для аудиосессий других плееров.\n\nНезависимая реализация интерфейса, вдохновлённая AIMP. Значения пресетов AIMP Windows указаны отдельно. Иконки: Google Material Icons, Apache 2.0.\n\nКод приложения: Apache 2.0. Обработка — Android DynamicsProcessing; совпадение звучания с AIMP не измерено. Приложение не связано с разработчиками AIMP.\n\nПеретаскивай точки по горизонтали. Удерживай точку или нажми на число для точного ввода.\n\nРазрешение на микрофон и доступ в интернет не требуются.")
                     .setPositiveButton("Закрыть",null).show();break;
-                case 8: appearance();break;
+                case 7: appearance();break;
             }
         }).show();
     }
@@ -158,7 +156,7 @@ public class MainActivity extends Activity {
         final String command="adb shell pm grant dev.local.sessioneq android.permission.DUMP";
         new AlertDialog.Builder(this).setTitle("Настройка поиска плееров")
             .setMessage("Для поиска уже играющих плееров Android требует разовый доступ к диагностике аудио. На компьютере с USB-отладкой выполни:\n\n"+command+"\n\nЗатем нажми «Подключить аудиосессию» ещё раз. Поиск выполняется только по нажатию. Доступ к уведомлениям и микрофону не нужен.")
-            .setPositiveButton("Понятно",null).setNegativeButton("Ввести ID вручную",(d,w)->connectManual()).setNeutralButton("Скопировать команду",(d,w)->{
+            .setPositiveButton("Понятно",null).setNeutralButton("Скопировать команду",(d,w)->{
                 ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Session EQ",command));
             }).show();
     }
@@ -183,13 +181,11 @@ public class MainActivity extends Activity {
                 progress.dismiss();scanDialog=null;
                 if(failure instanceof SecurityException&&!PlayerDirectory.hasAccess(MainActivity.this)){discoveryAccess();return;}
                 if(failure!=null){
-                    lastScan=failure.getClass().getSimpleName()+": "+failure.getMessage();
                     android.util.Log.w("SessionEQ", "Player discovery failed", failure);
                     new AlertDialog.Builder(this).setTitle("Поиск плееров")
-                    .setMessage(failure.getMessage()==null?"Не удалось прочитать список проигрывателей.":failure.getMessage())
+                    .setMessage("Не удалось найти проигрыватели. Повтори поиск или выбери Session EQ как внешний эквалайзер в настройках плеера.")
                     .setPositiveButton("Закрыть",null).setNeutralButton("Повторить",(d,w)->connect())
                     .setNegativeButton(state.autoPlayers.isEmpty()?null:"Выбранные",(d,w)->showPlayers(new ArrayList<>())).show();return;}
-                lastScan="Поиск завершён: плееров "+result.size();
                 if(selected==null){showPlayers(result);return;}
                 for(PlayerDirectory.Player current:result)
                     if(current.uid==selected.uid&&current.packageName.equals(selected.packageName)){
@@ -283,37 +279,13 @@ public class MainActivity extends Activity {
     private void connectionFailed() {
         new AlertDialog.Builder(this).setTitle("Не удалось подключить эквалайзер")
             .setMessage(service==null?"Открой экран приложения ещё раз.":service.status())
-            .setPositiveButton("Закрыть",null).setNeutralButton("Диагностика",(d,w)->diagnostics()).show();
+            .setPositiveButton("Закрыть",null).setNeutralButton("Выбрать плеер",(d,w)->connect()).show();
     }
-    private void connectManual() {
-        LinearLayout box=column();
-        box.addView(note("Запусти музыку и укажи текущий ID аудиосессии. При перезапуске плеера он может измениться.\n\nДля автоматического подключения выбери Session EQ как внешний эквалайзер в плеере и возобнови воспроизведение."));
-        EditText input=new EditText(this);input.setInputType(InputType.TYPE_CLASS_NUMBER);input.setHint("ID аудиосессии");
-        if(state.manualSession>0)input.setText(Integer.toString(state.manualSession));
-        box.addView(input);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Подключить сессию").setView(box)
-            .setPositiveButton("Подключить",null).setNegativeButton("Отмена",null).create();
-        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            try {
-                int id=Integer.parseInt(input.getText().toString().trim());
-                if(id<=0)throw new NumberFormatException();
-                state.manualSession=id;state.save(this);
-                queueSession(new Intent().putExtra(AudioEffect.EXTRA_AUDIO_SESSION,id)
-                    .putExtra(AudioEffect.EXTRA_PACKAGE_NAME,"Вручную"));
-                dialog.dismiss();handler.postDelayed(this::diagnostics,450);
-            } catch(NumberFormatException error){input.setError("Введи положительный ID сессии");}
-        }));dialog.show();
-    }
-    public void diagnostics() {
-        EqService service=EqService.instance;
-        String message="Доступ DUMP: "+(PlayerDirectory.hasAccess(this)?"выдан":"не выдан")+"\n"+lastScan+"\n\n"+(service==null?"Нет подключённой службы. Открой экран приложения заново.":service.diagnostics());
-        ScrollView scroll=new ScrollView(this);TextView text=note(message);text.setTextIsSelectable(true);
-        text.setPadding(32,16,32,16);scroll.addView(text);
-        new AlertDialog.Builder(this).setTitle("Диагностика").setView(scroll).setPositiveButton("Закрыть",null)
-            .setNeutralButton("Копировать",(d,w)->{
-                ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Session EQ",message));
-                Toast.makeText(this,"Диагностика скопирована",Toast.LENGTH_SHORT).show();
-            }).setNegativeButton("Подключить",(d,w)->connect()).show();
+    public void connectionInfo() {
+        String message=service==null?"Эквалайзер не подключён. Выбери проигрыватель.":service.status();
+        if(!state.autoPlayers.isEmpty())message+="\n\nАвтоподключение: "+(state.enabled?"включено":"приостановлено");
+        new AlertDialog.Builder(this).setTitle("Подключение").setMessage(message)
+            .setPositiveButton("Закрыть",null).setNeutralButton("Выбрать плеер",(d,w)->connect()).show();
     }
     public void editBand(int band) {
         EditText input=new EditText(this);input.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL|InputType.TYPE_NUMBER_FLAG_SIGNED);

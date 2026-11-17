@@ -22,7 +22,6 @@ public class EqService extends Service {
     private boolean foreground;
     private String notificationKey="";
     private boolean destroyed;
-    private final ArrayDeque<String> history=new ArrayDeque<>();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private EqState state;
     private String latest="Выбери проигрыватель в меню подключения.";
@@ -33,7 +32,6 @@ public class EqService extends Service {
     }
     @Override public void onCreate() {
         super.onCreate(); instance=this; state=new EqState(this); channel(this);
-        record("Экран подключён; аудиосессий пока нет");
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId) {
         if(intent!=null&&STOP.equals(intent.getAction())) {shutdown();return START_NOT_STICKY;}
@@ -44,7 +42,6 @@ public class EqService extends Service {
     public void addListener(Listener listener){listeners.add(listener);listener.onStatusChanged();}
     public void removeListener(Listener listener){listeners.remove(listener);}
     public boolean isEnabled(){return state.enabled;}
-    public boolean hasSessions(){return !sessions.isEmpty();}
     public boolean hasManualPlayer(String owner){return manualPlayers.contains(owner);}
     public boolean connectSelected(Map<Integer,String> selected) {
         if(selected.isEmpty())return false;
@@ -85,13 +82,15 @@ public class EqService extends Service {
         String owner=intent.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME);
         if(SessionPolicy.isBlocked(owner))return;
         int id=intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION,0);
-        if(id<=0) { record("Пропущен недопустимый ID сессии: "+id); return; }
+        if(id<=0)return;
         if(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())) {
             String current=sessions.snapshot().get(id);
             if(current!=null&&owner!=null&&!owner.equals(current))return;
             sessions.forget(id);manualPlayers.retainAll(sessions.snapshot().values());
-            releaseEffect(id);latest="Сессия "+id+" закрыта";record(latest);
-            if(sessions.isEmpty()&&AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers))latest="Автоподключение · ожидание музыки";
+            releaseEffect(id);
+            if(!effects.isEmpty())latest="Подключено: "+playerName(sessions.snapshot().get(effects.keySet().iterator().next()));
+            else latest=AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers)
+                ?"Автоподключение · ожидание музыки":"Воспроизведение завершено";
             stopForegroundIfIdle();updateNotification();return;
         }
         if(!SessionPolicy.mayAttach(owner))return;
@@ -128,16 +127,15 @@ public class EqService extends Service {
             final int sessionId=id;
             effect.setControlStatusListener((fx,control)->handler.post(()->{
                 if(destroyed||effects.get(sessionId)!=fx)return;
-                if(control) { record("Управление сессией "+sessionId+" получено");reconcile(); }
-                else { latest="Нет управления сессией "+sessionId+": проверь другие эквалайзеры"; record(latest); updateNotification(); }
+                if(control)reconcile();
+                else {latest="Другой эквалайзер управляет звуком. Проверь настройки плеера.";updateNotification();}
             }));
             applyOne(effect);
-            latest="Сессия "+id+" · "+owner+" · "+(effect.getEnabled()?"ON":"OFF");
-            record(latest+"; каналов="+effect.getChannelCount()+"; полос="+effect.getPreEqByChannelIndex(0).getBandCount());
+            latest="Подключено: "+playerName(owner);
         } catch(RuntimeException e) {
             if(effect!=null) {effects.remove(id);effect.release();}
-            latest="Сессия "+id+": "+e.getClass().getSimpleName()+" · "+e.getMessage();
-            record(latest);
+            Log.w("SessionEQ","Не удалось подключить аудиоэффект",e);
+            latest="Не удалось подключить эквалайзер к "+playerName(owner)+". Проверь настройки плеера.";
         }
     }
     private DynamicsProcessing.Limiter limiter() {
@@ -163,7 +161,7 @@ public class EqService extends Service {
         if(!state.enabled) {
             getSystemService(NotificationManager.class).cancel(2);
             for(Integer id:new ArrayList<>(effects.keySet()))releaseEffect(id);
-            latest="OFF · Аудиоэффекты освобождены";
+            latest="Эквалайзер выключен";
             stopForegroundIfIdle();updateNotification();return;
         }
         if(sessions.isEmpty())latest=AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers)
@@ -173,9 +171,10 @@ public class EqService extends Service {
             if(effect==null){createEffect(entry.getKey(),entry.getValue());continue;}
             try {
                 applyOne(effect);
-                latest="Сессия "+entry.getKey()+" · "+entry.getValue()+" · "+(effect.getEnabled()?"ON":"OFF");
+                latest="Подключено: "+playerName(entry.getValue());
             } catch(RuntimeException e) {
-                latest="Сессия "+entry.getKey()+": "+e.getMessage(); record(latest);
+                Log.w("SessionEQ","Не удалось применить настройки эквалайзера",e);
+                latest="Не удалось применить настройки. Проверь другие эквалайзеры.";
             }
         }
         stopForegroundIfIdle();
@@ -189,40 +188,12 @@ public class EqService extends Service {
             finally {effect.setControlStatusListener(null);effect.release();}
         }
     }
-    private void record(String message) {
-        if(history.size()>=30) history.removeFirst();
-        history.addLast(message); Log.i("SessionEQ",message);
-    }
-    public String status() { return latest; }
-    public String diagnostics() {
-        StringBuilder b=new StringBuilder("Session EQ 0.6.0\n")
-            .append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
-            .append(" · Android ").append(Build.VERSION.RELEASE).append("\n\n")
-            .append(latest).append("\n\nОбъектов эффектов: ").append(effects.size()).append('\n')
-            .append("Фоновая служба: ").append(foreground?(effects.isEmpty()?"ожидание автоподключения":"активна для аудиосессии"):"не удерживается").append('\n')
-            .append("Автоподключение: ").append(state.autoPlayers.isEmpty()?"не выбрано":state.autoPlayers.toString()).append('\n')
-            .append("Периодический опрос: нет\nWake lock: нет\n");
-        for(Map.Entry<Integer,DynamicsProcessing> e:effects.entrySet()) {
-            try {
-                DynamicsProcessing fx=e.getValue();
-                b.append("ID ").append(e.getKey()).append(" · control=").append(fx.hasControl())
-                    .append(" · enabled=").append(fx.getEnabled()).append("\n")
-                    .append("Каналы: ").append(fx.getChannelCount()).append(" · Полосы: ")
-                    .append(fx.getPreEqByChannelIndex(0).getBandCount()).append("\n")
-                    .append("Предпочтительный кадр: ").append(fx.getConfig().getPreferredFrameDuration()).append(" ms\n")
-                    .append("Input L/R: ").append(fx.getInputGainByChannelIndex(0)).append(" / ")
-                    .append(fx.getInputGainByChannelIndex(Math.min(1,fx.getChannelCount()-1))).append(" dB\n")
-                    .append("Полоса 0: ").append(fx.getPreEqBandByChannelIndex(0,0).getGain()).append(" dB\n");
-            } catch(RuntimeException error) { b.append(error.toString()).append('\n'); }
-        }
-        b.append("\nДоступные движки:\n");
+    public String status() {return latest;}
+    private String playerName(String owner) {
+        if(owner==null)return "проигрыватель";
         try {
-            AudioEffect.Descriptor[] descriptors=AudioEffect.queryEffects();
-            if(descriptors!=null) for(AudioEffect.Descriptor d:descriptors)
-                if(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING.equals(d.type)) b.append(d.name).append(" · ").append(d.uuid).append('\n');
-        } catch(RuntimeException error) { b.append(error.toString()).append('\n'); }
-        b.append("\nЖурнал:\n"); for(String line:history) b.append(line).append('\n');
-        return b.toString();
+            return getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(owner,0)).toString();
+        } catch(android.content.pm.PackageManager.NameNotFoundException ignored) {return "проигрыватель";}
     }
     private Notification notification() {
         Intent open=new Intent(this,MainActivity.class);
