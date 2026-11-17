@@ -11,7 +11,6 @@ public final class EqState {
     public boolean enabled, auto;
     public boolean limiter = true;
     public String preset = "Rock";
-    public int manualSession;
     public final Set<String> autoPlayers=new HashSet<>();
     public EqState(Context context) {
         SharedPreferences p = context.getSharedPreferences("eq", 0);
@@ -24,13 +23,12 @@ public final class EqState {
         preset=p.getString("preset","Rock");
         for(String owner:p.getStringSet("autoPlayers",new HashSet<String>()))
             if(SessionPolicy.mayAttach(owner))autoPlayers.add(owner);
-        manualSession=p.getInt("manualSession",0);
     }
     public void save(Context context) {
         SharedPreferences.Editor e=context.getSharedPreferences("eq",0).edit();
         for(int i=0;i<20;i++) e.putFloat("band"+i,gains[i]);
         e.putFloat("preamp",preamp).putFloat("balance",balance).putBoolean("enabled",enabled)
             .putBoolean("auto",auto).putBoolean("limiter",limiter).putString("preset",preset)
-            .putInt("manualSession",manualSession).putStringSet("autoPlayers",new HashSet<>(autoPlayers)).apply();
+            .remove("manualSession").putStringSet("autoPlayers",new HashSet<>(autoPlayers)).apply();
     }
 }

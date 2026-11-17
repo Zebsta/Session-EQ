@@ -58,7 +58,7 @@ public final class EqView extends View {
         String subtitle=TextUtils.ellipsize(state.preset,new android.text.TextPaint(p),246,TextUtils.TruncateAt.END).toString();
         text(canvas,subtitle,66,43,12,TEXT,Paint.Align.LEFT,false);
         line(canvas,20,27,39,27,TEXT,2.5f);line(canvas,20,27,30,17,TEXT,2.5f);line(canvas,20,27,30,37,TEXT,2.5f);
-        boolean attached=status.startsWith("Сессия ")&&status.contains(" · ");
+        boolean attached=status.startsWith("Подключено: ");
         circle(canvas,338,23,3.5f,attached?ORANGE:MUTED);
         text(canvas,"Баланс",180,66,10,TEXT,Paint.Align.CENTER,false);
         text(canvas,"L",44,85,10,MUTED,Paint.Align.CENTER,false);
@@ -117,7 +117,7 @@ public final class EqView extends View {
                 else if(lane>=0) change(x);
                 else if(!dragged) {
                     if(y<50&&x<55)host.finish();
-                    else if(y<50&&x>310)host.diagnostics();
+                    else if(y<50&&x>310)host.connectionInfo();
                     else if(y<50)host.presets();
                     else if(y>h-69) {
                         if(x<82){state.enabled=!state.enabled;host.changed();}

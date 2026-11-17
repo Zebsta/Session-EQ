@@ -30,7 +30,7 @@ public class SessionReceiver extends BroadcastReceiver {
         PendingIntent pi=PendingIntent.getActivity(context,2,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         Notification n=new Notification.Builder(context,EqService.CHANNEL).setSmallIcon(R.drawable.ic_stat_equalizer)
             .setContentTitle("Подключить Session EQ")
-            .setContentText("Нажми для подключения к аудиосессии "+session)
+            .setContentText("Нажми, чтобы подключить эквалайзер к плееру")
             .setContentIntent(pi).setAutoCancel(true).build();
         context.getSystemService(NotificationManager.class).notify(2,n);
     }

@@ -18,17 +18,16 @@ not a device screenshot.*
   and saved user presets.
 - ON/OFF, optional stereo-linked limiter, and AUTO preamp headroom compensation.
 - External-player effect-panel integration, session OPEN/CLOSE handling,
-  manual session ID entry, and readable diagnostics.
+  per-player auto-connect checkboxes, and readable connection status.
 - Event-based status updates with no periodic background polling, wake locks,
   network access, microphone permission or Accessibility service.
 
 ## Compatibility and limitations
 
-Version 0.6.0 includes optional DUMP-based player discovery at the user's request.
+Version 0.6.1 includes optional DUMP-based player discovery at the user's request.
 Start playback, open Settings → Connect audio session, then choose a player.
 AIMP is excluded. Scans run only on request and recheck the selected player.
-The existing ON/OFF toggle and external-player integration work without DUMP;
-explicit numeric session entry remains an advanced fallback.
+The ON/OFF toggle and external-player integration work without DUMP.
 
 After installing the APK, grant discovery access once over USB debugging:
 
@@ -36,7 +35,7 @@ After installing the APK, grant discovery access once over USB debugging:
 adb shell pm grant dev.local.sessioneq android.permission.DUMP
 ```
 
-The app displays whether access is granted in connection diagnostics. Discovery
+Discovery
 reads AudioService through an in-memory pipe with concurrent reading, a 2 MiB
 limit and a five-second timeout; it does not upload or log the full dump.
 If AudioService dumping calls routing APIs requiring system permissions,
@@ -44,8 +43,8 @@ the app falls back to the native `media.audio_flinger` dump using the same DUMP
 permission. Only current active output-track tables with explicit UID/session
 identity are accepted; historical/local logs and recording tracks are excluded.
 No routing or other privileged permission is requested.
-Denied access is shown as the actual error; DUMP setup is offered only when
-the permission is missing. The Android dump format is
+Connection failures show an actionable message; technical errors are available
+in Android logcat. The setup instruction is offered only when DUMP is missing. The Android dump format is
 device-dependent. There is no background polling, root or microphone access.
 Package visibility is limited to launcher apps and AIMP; ambiguous shared UIDs,
 other user profiles, calls and non-playing streams are not offered.
@@ -56,7 +55,7 @@ object does not by itself prove that every output is processed.
 
 Select Session EQ as an external equalizer in the music player, then restart
 playback. If the player directs session notifications to a different equalizer,
-use Settings → Connect audio session and enter the **current** session ID.
+use Settings → Connect audio session and choose the playing app.
 Session IDs can change; a previously observed ID is not a permanent player ID.
 
 A stopped background service may show a notification asking you to reconnect
