@@ -24,7 +24,7 @@ not a device screenshot.*
 
 ## Compatibility and limitations
 
-Version 0.5.3 includes optional DUMP-based player discovery at the user's request.
+Version 0.5.4 includes optional DUMP-based player discovery at the user's request.
 Start playback, open Settings → Connect audio session, then choose a player.
 AIMP is excluded. Scans run only on request and recheck the selected player.
 The existing ON/OFF toggle and external-player integration work without DUMP;
@@ -39,6 +39,11 @@ adb shell pm grant dev.local.sessioneq android.permission.DUMP
 The app displays whether access is granted in connection diagnostics. Discovery
 reads AudioService through an in-memory pipe with concurrent reading, a 2 MiB
 limit and a five-second timeout; it does not upload or log the full dump.
+If AudioService dumping calls routing APIs requiring system permissions,
+the app falls back to the native `media.audio_flinger` dump using the same DUMP
+permission. Only current active output-track tables with explicit UID/session
+identity are accepted; historical/local logs and recording tracks are excluded.
+No routing or other privileged permission is requested.
 Denied access is shown as the actual error; DUMP setup is offered only when
 the permission is missing. The Android dump format is
 device-dependent. There is no background polling, root or microphone access.

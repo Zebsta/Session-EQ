@@ -4,8 +4,9 @@ tasks.register('compileCoreChecks', JavaCompile) {
     source files('app/src/main/java/dev/local/sessioneq/EqMath.java',
                  'app/src/main/java/dev/local/sessioneq/SessionPolicy.java',
                  'app/src/main/java/dev/local/sessioneq/AudioDumpParser.java',
+                 'app/src/main/java/dev/local/sessioneq/AudioFlingerParser.java',
                  'app/src/main/java/dev/local/sessioneq/SessionRegistry.java',
-                 'tests/EqMathTest.java', 'tests/SessionRegistryTest.java', 'tests/SessionPolicyTest.java', 'tests/PlayerDiscoveryTest.java')
+                 'tests/EqMathTest.java', 'tests/SessionRegistryTest.java', 'tests/SessionPolicyTest.java', 'tests/PlayerDiscoveryTest.java', 'tests/AudioFlingerParserTest.java')
     classpath = files()
     destinationDirectory = layout.buildDirectory.dir('core-checks')
     sourceCompatibility = '1.8'
@@ -32,4 +33,9 @@ tasks.register('verifyPlayerDiscovery', JavaExec) {
     classpath = files(layout.buildDirectory.dir('core-checks'))
     mainClass = 'PlayerDiscoveryTest'
 }
-tasks.register('verifyCore') { dependsOn 'verifyEqMath', 'verifySessionRegistry', 'verifySessionPolicy', 'verifyPlayerDiscovery' }
+tasks.register('verifyAudioFlinger', JavaExec) {
+    dependsOn 'compileCoreChecks'
+    classpath = files(layout.buildDirectory.dir('core-checks'))
+    mainClass = 'AudioFlingerParserTest'
+}
+tasks.register('verifyCore') { dependsOn 'verifyEqMath', 'verifySessionRegistry', 'verifySessionPolicy', 'verifyPlayerDiscovery', 'verifyAudioFlinger' }
