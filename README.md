@@ -24,7 +24,7 @@ not a device screenshot.*
 
 ## Compatibility and limitations
 
-Version 0.5.4 includes optional DUMP-based player discovery at the user's request.
+Version 0.6.0 includes optional DUMP-based player discovery at the user's request.
 Start playback, open Settings → Connect audio session, then choose a player.
 AIMP is excluded. Scans run only on request and recheck the selected player.
 The existing ON/OFF toggle and external-player integration work without DUMP;
@@ -73,10 +73,30 @@ band boost (including preamp), while preserving the displayed preamp value.
 
 ## Idle behavior
 
-The settings screen uses a bound service. Native effects and a foreground
-service are retained only while effects are attached and ON. OFF disables and
-releases effects; closing the final audio session removes the started foreground
-service. Closing an idle screen releases its bound service too.
+The settings screen uses a bound service. With no auto-connect selection, native
+effects and the foreground service are retained only while effects are attached
+and ON. OFF releases effects and the foreground service. Closing the final audio
+session removes the started service unless auto-connect is armed.
+
+In the player picker, check **Auto** for each app that should connect automatically.
+Selection is stored by package name, never by audio-session ID. Checked apps stay
+in the picker while stopped so they can be unchecked. Selecting Auto enables EQ;
+for an already playing app its sessions are rechecked and attached. Tapping a row
+still connects that player once. Unchecking prevents future automatic connections;
+the current connection remains until CLOSE, OFF or Stop.
+
+When ON with at least one selected app, a quiet foreground notification remains
+while waiting. Incoming OPEN events from selected players attach their current
+session IDs, and CLOSE releases their native effects. No timed scans or wake
+locks are added. Other players may show the existing tap-to-connect notification;
+AIMP remains blocked. Player integration without OPEN/CLOSE still needs manual
+discovery. DUMP is needed for discovery, not for receiving session events.
+
+OFF and Stop suspend waiting and processing; player selections are preserved.
+Turning ON or reopening an ON, armed app resumes the service. The armed service
+requests system restart after process eviction, but Android can still stop it;
+if it is absent, the tap-to-connect notification is the fallback. After force-stop
+or reboot, open Session EQ again. No boot receiver is installed.
 
 A normal pause that keeps the audio session open retains the connection so music
 can resume without manual reconnection. There are no recurring Session EQ Java

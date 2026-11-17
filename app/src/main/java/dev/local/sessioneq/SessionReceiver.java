@@ -11,10 +11,18 @@ public class SessionReceiver extends BroadcastReceiver {
         if(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())&&!SessionPolicy.mayAttach(owner))return;
         int session=intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION,0);
         if(session<=0) return;
-        if(EqService.instance!=null) { EqService.instance.session(intent); return; }
-        if(!AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())) return;
+        EqService service=EqService.instance;
+        if(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())) {
+            if(service!=null)service.session(intent);
+            return;
+        }
+        if(!AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction()))return;
+        EqState settings=new EqState(context);
+        if(service!=null&&AutoConnectPolicy.acceptOpen(settings.enabled,settings.autoPlayers,owner,service.hasPlayer(owner))) {
+            service.session(intent);return;
+        }
         // OFF must not resurrect a foreground service or prompt for every new song.
-        if(!new EqState(context).enabled)return;
+        if(!settings.enabled)return;
         // Background receivers cannot reliably launch foreground services on modern Android.
         // A user tap brings the app to the foreground before starting the service.
         EqService.channel(context);

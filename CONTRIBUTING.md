@@ -15,6 +15,9 @@ For audio lifecycle changes, also test on a real device:
 - pause/resume and session replacement;
 - closing one of several sessions and closing the final session;
 - OFF with the screen closed: no retained foreground service or native effects;
+- auto-connect ON: final CLOSE releases effects but retains quiet waiting service;
+- new OPEN from checked app uses new session ID; unselected app/AIMP never auto-attach;
+- uncheck final app: idle service is released; saved checked apps remain editable;
 - unchanged screenshot Rock values and Windows preset data.
 
 Do not introduce polling, wake locks, network access or automatic grants of

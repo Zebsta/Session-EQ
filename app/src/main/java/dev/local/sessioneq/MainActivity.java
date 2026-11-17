@@ -31,7 +31,7 @@ public class MainActivity extends Activity {
     private final ServiceConnection connection=new ServiceConnection(){
         @Override public void onServiceConnected(ComponentName name,IBinder binder) {
             service=((EqService.LocalBinder)binder).getService();
-            flushChanges();service.addListener(statusListener);
+            flushChanges();service.applySettings();service.addListener(statusListener);
             while(!pendingSessions.isEmpty())service.session(pendingSessions.removeFirst());
             if(pendingSelection!=null){
                 boolean connected=service.connectSelected(pendingSelection);pendingSelection=null;
@@ -129,7 +129,7 @@ public class MainActivity extends Activity {
                     state.enabled=false;state.save(this);
                     if(EqService.instance!=null)EqService.instance.shutdown();
                     finish();break;
-                case 7: new AlertDialog.Builder(this).setTitle("Session EQ 0.5.4")
+                case 7: new AlertDialog.Builder(this).setTitle("Session EQ 0.6.0")
                     .setMessage("20-полосный эквалайзер для аудиосессий других плееров.\n\nНезависимая реализация интерфейса, вдохновлённая AIMP. Значения пресетов AIMP Windows указаны отдельно. Иконки: Google Material Icons, Apache 2.0.\n\nКод приложения: Apache 2.0. Обработка — Android DynamicsProcessing; совпадение звучания с AIMP не измерено. Приложение не связано с разработчиками AIMP.\n\nПеретаскивай точки по горизонтали. Удерживай точку или нажми на число для точного ввода.\n\nРазрешение на микрофон и доступ в интернет не требуются.")
                     .setPositiveButton("Закрыть",null).show();break;
                 case 8: appearance();break;
@@ -148,7 +148,10 @@ public class MainActivity extends Activity {
             }).setNegativeButton("Отмена",null).show();
     }
     public void connect() {
-        if(!PlayerDirectory.hasAccess(this)){discoveryAccess();return;}
+        if(!PlayerDirectory.hasAccess(this)){
+            if(!state.autoPlayers.isEmpty())showPlayers(new ArrayList<>());else discoveryAccess();
+            return;
+        }
         scanPlayers(null);
     }
     private void discoveryAccess() {
@@ -159,7 +162,8 @@ public class MainActivity extends Activity {
                 ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Session EQ",command));
             }).show();
     }
-    private void scanPlayers(PlayerDirectory.Player selected) {
+    private void scanPlayers(PlayerDirectory.Player selected) {scanPlayers(selected,false);}
+    private void scanPlayers(PlayerDirectory.Player selected,boolean additive) {
         if(scanRunning){Toast.makeText(this,"Поиск плееров ещё выполняется",Toast.LENGTH_SHORT).show();return;}
         scanRunning=true;
         final int request=++scanGeneration;
@@ -183,18 +187,36 @@ public class MainActivity extends Activity {
                     android.util.Log.w("SessionEQ", "Player discovery failed", failure);
                     new AlertDialog.Builder(this).setTitle("Поиск плееров")
                     .setMessage(failure.getMessage()==null?"Не удалось прочитать список проигрывателей.":failure.getMessage())
-                    .setPositiveButton("Закрыть",null).setNeutralButton("Повторить",(d,w)->connect()).show();return;}
+                    .setPositiveButton("Закрыть",null).setNeutralButton("Повторить",(d,w)->connect())
+                    .setNegativeButton(state.autoPlayers.isEmpty()?null:"Выбранные",(d,w)->showPlayers(new ArrayList<>())).show();return;}
                 lastScan="Поиск завершён: плееров "+result.size();
                 if(selected==null){showPlayers(result);return;}
                 for(PlayerDirectory.Player current:result)
-                    if(current.uid==selected.uid&&current.packageName.equals(selected.packageName)){attachPlayer(current);return;}
+                    if(current.uid==selected.uid&&current.packageName.equals(selected.packageName)){
+                        if(additive) {
+                            if(service!=null&&state.enabled&&state.autoPlayers.contains(current.packageName))
+                                for(int id:current.sessionIds)service.attach(id,current.packageName);
+                        } else attachPlayer(current);
+                        return;
+                    }
                 new AlertDialog.Builder(this).setTitle("Воспроизведение остановлено")
                     .setMessage("Запусти музыку в выбранном плеере и обнови список.")
                     .setPositiveButton("Обновить",(d,w)->connect()).setNegativeButton("Закрыть",null).show();
             });
         },"session-eq-player-scan");worker.setDaemon(true);worker.start();
     }
-    private void showPlayers(List<PlayerDirectory.Player> players) {
+    private void showPlayers(List<PlayerDirectory.Player> found) {
+        List<PlayerDirectory.Player> players=new ArrayList<>(found);
+        for(String owner:new TreeSet<>(state.autoPlayers)) {
+            boolean present=false;for(PlayerDirectory.Player player:players)if(player.packageName.equals(owner))present=true;
+            if(present||!SessionPolicy.mayAttach(owner))continue;
+            try {
+                android.content.pm.ApplicationInfo info=getPackageManager().getApplicationInfo(owner,0);
+                players.add(new PlayerDirectory.Player(owner,getPackageManager().getApplicationLabel(info).toString(),info.uid));
+            } catch(PackageManager.NameNotFoundException missing) {
+                players.add(new PlayerDirectory.Player(owner,owner+" (не установлено)",-1));
+            }
+        }
         if(players.isEmpty()) {
             new AlertDialog.Builder(this).setTitle("Нет играющих плееров")
                 .setMessage("Запусти музыку и обнови список. AIMP исключён: у него есть собственный эквалайзер.")
@@ -210,13 +232,44 @@ public class MainActivity extends Activity {
                 catch(PackageManager.NameNotFoundException ignored){}
                 LinearLayout words=new LinearLayout(MainActivity.this);words.setOrientation(LinearLayout.VERTICAL);words.setPadding(pad,0,0,0);
                 TextView title=new TextView(MainActivity.this);title.setText(player.label);title.setTextSize(17);words.addView(title);
-                TextView detail=new TextView(MainActivity.this);detail.setText(player.sessionIds.size()>1?"Воспроизводится · несколько потоков":"Сейчас воспроизводит звук");
-                detail.setTextSize(13);words.addView(detail);row.addView(words,new LinearLayout.LayoutParams(0,-2,1));return row;
+                TextView detail=new TextView(MainActivity.this);detail.setText(player.sessionIds.isEmpty()?"Сейчас не воспроизводит звук":player.sessionIds.size()>1?"Воспроизводится · несколько потоков":"Сейчас воспроизводит звук");
+                detail.setTextSize(13);words.addView(detail);row.addView(words,new LinearLayout.LayoutParams(0,-2,1));
+                CheckBox automatic=new CheckBox(MainActivity.this);automatic.setText("Авто");automatic.setFocusable(false);
+                automatic.setContentDescription("Автоподключение: "+player.label);
+                automatic.setChecked(state.autoPlayers.contains(player.packageName));
+                automatic.setOnCheckedChangeListener((button,checked)->{
+                    handler.removeCallbacks(apply);
+                    if(checked&&player.uid<0){button.setChecked(false);return;}
+                    if(checked){state.autoPlayers.add(player.packageName);state.enabled=true;}
+                    else state.autoPlayers.remove(player.packageName);
+                    state.save(MainActivity.this);dirty=false;
+                    if(service!=null) {
+                        service.applySettings();
+                        if(checked&&!player.sessionIds.isEmpty())scanPlayers(player,true);
+                    }
+                    view.invalidate();
+                });
+                // A removed package can be unchecked but cannot be newly armed.
+                if(player.uid<0&&!automatic.isChecked())automatic.setEnabled(false);
+                row.addView(automatic);return row;
             }
         };
-        new AlertDialog.Builder(this).setTitle("Выбрать проигрыватель")
-            .setAdapter(adapter,(d,which)->scanPlayers(players.get(which)))
-            .setNeutralButton("Обновить",(d,w)->connect()).setNegativeButton("Отмена",null).show();
+        ListView list=new ListView(this);list.setAdapter(adapter);
+        LinearLayout box=column();box.addView(note("Нажми на плеер для подключения сейчас. «Авто» запоминает приложение и подключает его новые сессии. При ON остаётся тихое уведомление ожидания. AIMP исключён."));
+        box.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        AlertDialog chooser=new AlertDialog.Builder(this).setTitle("Подключение плееров").setView(box)
+            .setNeutralButton("Обновить",(d,w)->{
+                if(PlayerDirectory.hasAccess(this))scanPlayers(null);else discoveryAccess();
+            }).setNegativeButton("Закрыть",null).create();
+        list.setOnItemClickListener((parent,row,which,id)->{
+            PlayerDirectory.Player player=players.get(which);
+            if(player.sessionIds.isEmpty()) {Toast.makeText(this,"Запусти музыку в этом плеере и обнови список",Toast.LENGTH_SHORT).show();return;}
+            chooser.dismiss();scanPlayers(player);
+        });
+        chooser.setOnShowListener(d->{
+            android.util.DisplayMetrics metrics=getResources().getDisplayMetrics();
+            chooser.getWindow().setLayout(-1,Math.min((int)(560*metrics.density),(int)(metrics.heightPixels*.8f)));
+        });chooser.show();
     }
     private void attachPlayer(PlayerDirectory.Player player) {
         if(!SessionPolicy.mayAttach(player.packageName))return;

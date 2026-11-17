@@ -9,7 +9,9 @@ framework views and DynamicsProcessing; there are no application dependencies.
 - Preserve light/dark themes and the selected black sliders in an orange disk on
   a dark background. Use the documented AIMP asset gradient; do not restore E.
 - Preserve the event-based lifecycle. No periodic status/audio-session polling,
-  wake locks or foreground service when OFF or without native effects.
+  wake locks or foreground service when OFF. The user-authorized per-player
+  auto-connect mode may retain a quiet foreground service with no effects while
+  ON and waiting for selected players; do not scan repeatedly during that wait.
 - Do not change filter parameters while doing unrelated UI work.
 - AIMP OPEN/external-panel requests must not create effects. Preserve SessionPolicy.
 - DUMP-based discovery was resumed at the user's request for version 0.5.2.
