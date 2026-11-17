@@ -2,6 +2,8 @@ package dev.local.sessioneq;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class EqState {
     public final float[] gains = new float[20];
@@ -10,6 +12,7 @@ public final class EqState {
     public boolean limiter = true;
     public String preset = "Rock";
     public int manualSession;
+    public final Set<String> autoPlayers=new HashSet<>();
     public EqState(Context context) {
         SharedPreferences p = context.getSharedPreferences("eq", 0);
         for(int i=0;i<20;i++) gains[i]=EqMath.clamp(p.getFloat("band"+i,EqMath.ROCK[i]),-15,15);
@@ -19,6 +22,8 @@ public final class EqState {
         auto=p.getBoolean("auto",false);
         limiter=p.getBoolean("limiter",true);
         preset=p.getString("preset","Rock");
+        for(String owner:p.getStringSet("autoPlayers",new HashSet<String>()))
+            if(SessionPolicy.mayAttach(owner))autoPlayers.add(owner);
         manualSession=p.getInt("manualSession",0);
     }
     public void save(Context context) {
@@ -26,6 +31,6 @@ public final class EqState {
         for(int i=0;i<20;i++) e.putFloat("band"+i,gains[i]);
         e.putFloat("preamp",preamp).putFloat("balance",balance).putBoolean("enabled",enabled)
             .putBoolean("auto",auto).putBoolean("limiter",limiter).putString("preset",preset)
-            .putInt("manualSession",manualSession).apply();
+            .putInt("manualSession",manualSession).putStringSet("autoPlayers",new HashSet<>(autoPlayers)).apply();
     }
 }

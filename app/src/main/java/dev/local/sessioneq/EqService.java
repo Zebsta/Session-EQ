@@ -14,6 +14,7 @@ public class EqService extends Service {
     public static final String CHANNEL="session-eq";
     private final LinkedHashMap<Integer, DynamicsProcessing> effects=new LinkedHashMap<>();
     private final SessionRegistry sessions=new SessionRegistry();
+    private final Set<String> manualPlayers=new HashSet<>();
     public interface Listener {void onStatusChanged();}
     private final Set<Listener> listeners=new LinkedHashSet<>();
     public final class LocalBinder extends Binder {public EqService getService(){return EqService.this;}}
@@ -35,48 +36,66 @@ public class EqService extends Service {
         record("Экран подключён; аудиосессий пока нет");
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId) {
-        if(intent==null) return START_NOT_STICKY;
-        if(STOP.equals(intent.getAction())) shutdown();
-        return START_NOT_STICKY;
+        if(intent!=null&&STOP.equals(intent.getAction())) {shutdown();return START_NOT_STICKY;}
+        state=new EqState(this);
+        reconcile();
+        return AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers)?START_STICKY:START_NOT_STICKY;
     }
     public void addListener(Listener listener){listeners.add(listener);listener.onStatusChanged();}
     public void removeListener(Listener listener){listeners.remove(listener);}
     public boolean isEnabled(){return state.enabled;}
     public boolean hasSessions(){return !sessions.isEmpty();}
+    public boolean hasManualPlayer(String owner){return manualPlayers.contains(owner);}
     public boolean connectSelected(Map<Integer,String> selected) {
         if(selected.isEmpty())return false;
         for(Map.Entry<Integer,String> entry:selected.entrySet())
             if(entry.getKey()<=0||!SessionPolicy.mayAttach(entry.getValue()))return false;
         for(Integer id:new ArrayList<>(effects.keySet()))releaseEffect(id);
-        sessions.clear();
+        sessions.clear();manualPlayers.clear();manualPlayers.addAll(selected.values());
         for(Map.Entry<Integer,String> entry:selected.entrySet())sessions.remember(entry.getKey(),entry.getValue());
         state=new EqState(this);reconcile();return !effects.isEmpty();
     }
-    public void applySettings(){state=new EqState(this);reconcile();}
+    public void applySettings(){
+        boolean waiting=AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers);
+        state=new EqState(this);
+        // Refresh Android's restart mode when arming/disarming an already active service.
+        if(foreground&&waiting!=AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers))
+            startService(new Intent(this,EqService.class).setAction(KEEP_ALIVE));
+        reconcile();
+    }
     private void ensureForeground() {
         if(foreground)return;
         // Called from a user-visible bound screen, or an already running foreground service.
         startService(new Intent(this,EqService.class).setAction(KEEP_ALIVE));
+        getSystemService(NotificationManager.class).cancel(2);
         try {
             startForeground(1,notification());foreground=true;notificationKey=state.enabled+latest;
         } catch(RuntimeException error){stopSelf();throw error;}
     }
     private void stopForegroundIfIdle() {
         if(!effects.isEmpty())return;
+        if(AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers)) {ensureForeground();return;}
         if(foreground){stopForeground(STOP_FOREGROUND_REMOVE);foreground=false;notificationKey="";}
         // A visible screen can keep a bound service; there is no started idle service.
         stopSelf();
     }
-    public void session(Intent intent) {
+    public void session(Intent intent) {handleSession(intent,true);}
+    public void sessionEvent(Intent intent) {handleSession(intent,false);}
+    private void handleSession(Intent intent,boolean explicit) {
         String owner=intent.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME);
         if(SessionPolicy.isBlocked(owner))return;
         int id=intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION,0);
         if(id<=0) { record("Пропущен недопустимый ID сессии: "+id); return; }
         if(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())) {
-            sessions.forget(id);releaseEffect(id);latest="Сессия "+id+" закрыта";record(latest);
+            String current=sessions.snapshot().get(id);
+            if(current!=null&&owner!=null&&!owner.equals(current))return;
+            sessions.forget(id);manualPlayers.retainAll(sessions.snapshot().values());
+            releaseEffect(id);latest="Сессия "+id+" закрыта";record(latest);
+            if(sessions.isEmpty()&&AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers))latest="Автоподключение · ожидание музыки";
             stopForegroundIfIdle();updateNotification();return;
         }
         if(!SessionPolicy.mayAttach(owner))return;
+        if(explicit)manualPlayers.add(owner);
         attach(id,owner);
     }
     private DynamicsProcessing.Eq eq() {
@@ -88,7 +107,7 @@ public class EqService extends Service {
         if(id<=0||!SessionPolicy.mayAttach(owner))return;
         state=new EqState(this);
         Integer evicted=sessions.remember(id,owner);
-        if(evicted!=null)releaseEffect(evicted);
+        if(evicted!=null){releaseEffect(evicted);manualPlayers.retainAll(sessions.snapshot().values());}
         reconcile();
     }
     private void createEffect(int id,String owner) {
@@ -142,11 +161,13 @@ public class EqService extends Service {
     }
     private void reconcile() {
         if(!state.enabled) {
+            getSystemService(NotificationManager.class).cancel(2);
             for(Integer id:new ArrayList<>(effects.keySet()))releaseEffect(id);
             latest="OFF · Аудиоэффекты освобождены";
             stopForegroundIfIdle();updateNotification();return;
         }
-        if(sessions.isEmpty())latest="Выбери проигрыватель в меню подключения.";
+        if(sessions.isEmpty())latest=AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers)
+            ?"Автоподключение · ожидание музыки":"Выбери проигрыватель в меню подключения.";
         for(Map.Entry<Integer,String> entry:sessions.snapshot().entrySet()) {
             DynamicsProcessing effect=effects.get(entry.getKey());
             if(effect==null){createEffect(entry.getKey(),entry.getValue());continue;}
@@ -174,11 +195,12 @@ public class EqService extends Service {
     }
     public String status() { return latest; }
     public String diagnostics() {
-        StringBuilder b=new StringBuilder("Session EQ 0.5.4\n")
+        StringBuilder b=new StringBuilder("Session EQ 0.6.0\n")
             .append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
             .append(" · Android ").append(Build.VERSION.RELEASE).append("\n\n")
             .append(latest).append("\n\nОбъектов эффектов: ").append(effects.size()).append('\n')
-            .append("Фоновая служба: ").append(foreground?"активна для аудиосессии":"не удерживается").append('\n')
+            .append("Фоновая служба: ").append(foreground?(effects.isEmpty()?"ожидание автоподключения":"активна для аудиосессии"):"не удерживается").append('\n')
+            .append("Автоподключение: ").append(state.autoPlayers.isEmpty()?"не выбрано":state.autoPlayers.toString()).append('\n')
             .append("Периодический опрос: нет\nWake lock: нет\n");
         for(Map.Entry<Integer,DynamicsProcessing> e:effects.entrySet()) {
             try {
@@ -220,13 +242,14 @@ public class EqService extends Service {
         for(Listener listener:new ArrayList<>(listeners))listener.onStatusChanged();
     }
     public void shutdown() {
-        state.enabled=false;state.save(this);sessions.clear();
+        state=new EqState(this);state.enabled=false;state.save(this);sessions.clear();manualPlayers.clear();
+        getSystemService(NotificationManager.class).cancel(2);
         reconcile();
     }
     @Override public void onDestroy() {
         destroyed=true;handler.removeCallbacksAndMessages(null);
         for(Integer id:new ArrayList<>(effects.keySet()))releaseEffect(id);
-        sessions.clear();listeners.clear();
+        sessions.clear();manualPlayers.clear();listeners.clear();
         if(foreground)stopForeground(STOP_FOREGROUND_REMOVE);
         instance=null;super.onDestroy();
     }
