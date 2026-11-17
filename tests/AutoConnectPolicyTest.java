@@ -23,7 +23,7 @@ public class AutoConnectPolicyTest {
         if(AutoConnectPolicy.acceptOpen(true,selected,"ru.yandex.music",false))sessions.remember(202,"ru.yandex.music");
         check(sessions.snapshot().containsKey(202)&&!sessions.snapshot().containsKey(101),"Restarted player must use new session ID");
         selected.clear();
-        check(!AutoConnectPolicy.acceptOpen(true,selected,"ru.yandex.music",false),"Unchecking must prevent next automatic connection");
+        check(!AutoConnectPolicy.acceptOpen(true,selected,"ru.yandex.music",false),"Unchecking auto-only player must prevent next automatic connection, even before old CLOSE");
         System.out.println("Auto-connect: selected players, OFF/STOP, final CLOSE, replacement session and AIMP exclusion passed");
     }
 }

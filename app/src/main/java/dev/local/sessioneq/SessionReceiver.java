@@ -13,13 +13,13 @@ public class SessionReceiver extends BroadcastReceiver {
         if(session<=0) return;
         EqService service=EqService.instance;
         if(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())) {
-            if(service!=null)service.session(intent);
+            if(service!=null)service.sessionEvent(intent);
             return;
         }
         if(!AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction()))return;
         EqState settings=new EqState(context);
-        if(service!=null&&AutoConnectPolicy.acceptOpen(settings.enabled,settings.autoPlayers,owner,service.hasPlayer(owner))) {
-            service.session(intent);return;
+        if(service!=null&&AutoConnectPolicy.acceptOpen(settings.enabled,settings.autoPlayers,owner,service.hasManualPlayer(owner))) {
+            service.sessionEvent(intent);return;
         }
         // OFF must not resurrect a foreground service or prompt for every new song.
         if(!settings.enabled)return;

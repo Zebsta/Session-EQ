@@ -14,6 +14,7 @@ public class EqService extends Service {
     public static final String CHANNEL="session-eq";
     private final LinkedHashMap<Integer, DynamicsProcessing> effects=new LinkedHashMap<>();
     private final SessionRegistry sessions=new SessionRegistry();
+    private final Set<String> manualPlayers=new HashSet<>();
     public interface Listener {void onStatusChanged();}
     private final Set<Listener> listeners=new LinkedHashSet<>();
     public final class LocalBinder extends Binder {public EqService getService(){return EqService.this;}}
@@ -44,13 +45,13 @@ public class EqService extends Service {
     public void removeListener(Listener listener){listeners.remove(listener);}
     public boolean isEnabled(){return state.enabled;}
     public boolean hasSessions(){return !sessions.isEmpty();}
-    public boolean hasPlayer(String owner){return sessions.snapshot().containsValue(owner);}
+    public boolean hasManualPlayer(String owner){return manualPlayers.contains(owner);}
     public boolean connectSelected(Map<Integer,String> selected) {
         if(selected.isEmpty())return false;
         for(Map.Entry<Integer,String> entry:selected.entrySet())
             if(entry.getKey()<=0||!SessionPolicy.mayAttach(entry.getValue()))return false;
         for(Integer id:new ArrayList<>(effects.keySet()))releaseEffect(id);
-        sessions.clear();
+        sessions.clear();manualPlayers.clear();manualPlayers.addAll(selected.values());
         for(Map.Entry<Integer,String> entry:selected.entrySet())sessions.remember(entry.getKey(),entry.getValue());
         state=new EqState(this);reconcile();return !effects.isEmpty();
     }
@@ -78,7 +79,9 @@ public class EqService extends Service {
         // A visible screen can keep a bound service; there is no started idle service.
         stopSelf();
     }
-    public void session(Intent intent) {
+    public void session(Intent intent) {handleSession(intent,true);}
+    public void sessionEvent(Intent intent) {handleSession(intent,false);}
+    private void handleSession(Intent intent,boolean explicit) {
         String owner=intent.getStringExtra(AudioEffect.EXTRA_PACKAGE_NAME);
         if(SessionPolicy.isBlocked(owner))return;
         int id=intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION,0);
@@ -86,11 +89,13 @@ public class EqService extends Service {
         if(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION.equals(intent.getAction())) {
             String current=sessions.snapshot().get(id);
             if(current!=null&&owner!=null&&!owner.equals(current))return;
-            sessions.forget(id);releaseEffect(id);latest="Сессия "+id+" закрыта";record(latest);
+            sessions.forget(id);manualPlayers.retainAll(sessions.snapshot().values());
+            releaseEffect(id);latest="Сессия "+id+" закрыта";record(latest);
             if(sessions.isEmpty()&&AutoConnectPolicy.keepWaiting(state.enabled,state.autoPlayers))latest="Автоподключение · ожидание музыки";
             stopForegroundIfIdle();updateNotification();return;
         }
         if(!SessionPolicy.mayAttach(owner))return;
+        if(explicit)manualPlayers.add(owner);
         attach(id,owner);
     }
     private DynamicsProcessing.Eq eq() {
@@ -102,7 +107,7 @@ public class EqService extends Service {
         if(id<=0||!SessionPolicy.mayAttach(owner))return;
         state=new EqState(this);
         Integer evicted=sessions.remember(id,owner);
-        if(evicted!=null)releaseEffect(evicted);
+        if(evicted!=null){releaseEffect(evicted);manualPlayers.retainAll(sessions.snapshot().values());}
         reconcile();
     }
     private void createEffect(int id,String owner) {
@@ -237,14 +242,14 @@ public class EqService extends Service {
         for(Listener listener:new ArrayList<>(listeners))listener.onStatusChanged();
     }
     public void shutdown() {
-        state=new EqState(this);state.enabled=false;state.save(this);sessions.clear();
+        state=new EqState(this);state.enabled=false;state.save(this);sessions.clear();manualPlayers.clear();
         getSystemService(NotificationManager.class).cancel(2);
         reconcile();
     }
     @Override public void onDestroy() {
         destroyed=true;handler.removeCallbacksAndMessages(null);
         for(Integer id:new ArrayList<>(effects.keySet()))releaseEffect(id);
-        sessions.clear();listeners.clear();
+        sessions.clear();manualPlayers.clear();listeners.clear();
         if(foreground)stopForeground(STOP_FOREGROUND_REMOVE);
         instance=null;super.onDestroy();
     }
