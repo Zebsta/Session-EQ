@@ -26,3 +26,14 @@ cannot be established by JVM tests alone.
 
 Never commit tokens, signing keys, local SDK paths, device dumps or original
 third-party application archives. Release signing keys must stay outside the repo.
+
+## Branches and releases
+
+`main` contains merged work. Use short-lived `feature/*`, `fix/*`, `docs/*` or
+`cleanup/*` branches and target pull requests at `main`. The `build` check must
+pass before merging. Delete completed branches after merging; preserve unfinished
+work before deleting its branch. GitHub is configured to delete merged branches.
+
+Published versions use annotated `vX.Y.Z` tags and GitHub Releases with APKs and
+SHA-256 checksums. Archived experiments use `archive/*` tags, not permanent
+feature branches. See [the release checklist](docs/BUILD.md#порядок-публикации).
